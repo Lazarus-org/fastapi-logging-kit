@@ -34,6 +34,9 @@ classifiers = [
   "Topic :: System :: Logging",
 ]
 
+[project.scripts]
+fast-logging = "fast_logging.commands.cli:main"
+
 [tool.poetry]
 packages = [
   { include = "fast_logging" },
