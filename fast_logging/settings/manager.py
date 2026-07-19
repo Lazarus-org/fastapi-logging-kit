@@ -146,16 +146,19 @@ class SettingsManager:
         self.email_notifier: LogEmailNotifier = self.get(
             "LOG_EMAIL_NOTIFIER", self.default_logging.log_email_notifier
         )
-        self.email_notifier_enabled: bool = self.email_notifier.get("ENABLE", False)
+        # Read through a mapping-safe view: a malformed LOG_EMAIL_NOTIFIER is
+        # the validators' problem to report, and loading must not crash before
+        # the checks get the chance to say so.
+        notifier = self.email_notifier if isinstance(self.email_notifier, Mapping) else {}
+        self.email_notifier_enabled: bool = notifier.get("ENABLE", False)
         self.email_notifier_log_levels: NotifierLogLevels = [
-            "ERROR" if self.email_notifier.get("NOTIFY_ERROR", False) else None,
-            ("CRITICAL" if self.email_notifier.get("NOTIFY_CRITICAL", False) else None),
+            "ERROR" if notifier.get("NOTIFY_ERROR", False) else None,
+            ("CRITICAL" if notifier.get("NOTIFY_CRITICAL", False) else None),
         ]
-        self.email_notifier_log_format: FormatOption = self.email_notifier.get(
-            "LOG_FORMAT", 1
-        )
-        self.email_settings: EmailSettings = self.get(
-            "EMAIL", self.default_logging.email_settings
+        self.email_notifier_log_format: FormatOption = notifier.get("LOG_FORMAT", 1)
+        email_settings = self.get("EMAIL", self.default_logging.email_settings)
+        self.email_settings: EmailSettings = (
+            email_settings if isinstance(email_settings, Mapping) else {}
         )
         self.auto_initialization_enabled: bool = self.get(
             "AUTO_INITIALIZATION_ENABLE",
@@ -174,9 +177,7 @@ class SettingsManager:
         self.include_log_iboard: bool = self.get(
             "INCLUDE_LOG_iBOARD", self.default_logging.include_log_iboard
         )
-        self.use_email_notifier_template: bool = self.email_notifier.get(
-            "USE_TEMPLATE", True
-        )
+        self.use_email_notifier_template: bool = notifier.get("USE_TEMPLATE", True)
         self.debug: bool = self.get("DEBUG", self.default_logging.debug)
 
         # Rotation settings — merge user config over the dataclass defaults

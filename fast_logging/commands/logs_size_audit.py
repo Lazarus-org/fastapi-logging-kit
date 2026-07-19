@@ -63,7 +63,10 @@ class Command(BaseCommand):
         logger.info("Total log directory size: %s MB", total_size_mb)
 
         if int(total_size_mb) >= self.size_limit:
-            cmd.validate_email_settings()
+            # ADMIN_EMAIL is the recipient of the warning, so it is required
+            # here — validating without it let the send proceed with a
+            # recipient list of [None].
+            cmd.validate_email_settings(require_admin_email=True)
             # Send warning email if total size exceeds the size limit
             self.send_warning_email(total_size_mb, breakdown)
             self.stdout.write(self.style.SUCCESS("Warning email sent successfully."))

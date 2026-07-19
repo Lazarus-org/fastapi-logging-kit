@@ -3,6 +3,7 @@ import logging
 from typing import Any, Dict, Optional
 
 from fast_logging.constants.log_format_options import FORMAT_OPTIONS
+from fast_logging.filters import ContextVarFilter
 from fast_logging.handlers import EmailHandler
 from fast_logging.settings.conf import LogConfig
 from fast_logging.utils.get_conf import get_config, get_email_setting
@@ -64,6 +65,12 @@ def log_and_notify_admin(
         ) from e
     # Create a formatter instance and pass the email_notifier format
     formatter = logging.Formatter(LogConfig.resolve_format(_format))
+
+    # Populate the context the same way ContextVarFilter does for handler-bound
+    # records. Every default format option references %(context)s, and this
+    # record never passes through a handler's filters, so without this the
+    # format call raises "Formatting field not found in record: 'context'".
+    ContextVarFilter().filter(log_record)
 
     # Format the log message using the formatter
     formatted_message = formatter.format(log_record)

@@ -181,7 +181,10 @@ def check_logging_settings(app_configs: Dict[str, Any], **kwargs: Any) -> List[E
     log_email_notifier = settings_manager.email_notifier
     errors.extend(validate_email_notifier(log_email_notifier))  # type: ignore
 
-    if log_email_notifier.get("ENABLE", False):  # type: ignore
+    # Only inspect the notifier further when it is actually a mapping; a
+    # malformed value has already been reported above as E017, and reading
+    # through it here would raise instead of surfacing that error.
+    if isinstance(log_email_notifier, dict) and log_email_notifier.get("ENABLE", False):
         errors.extend(check_email_settings())
 
     return errors
