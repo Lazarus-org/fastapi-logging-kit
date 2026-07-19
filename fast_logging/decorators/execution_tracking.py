@@ -55,7 +55,7 @@ def execution_tracker(
     errors.extend(
         validate_boolean_setting(log_queries, "execution_tracker.log_queries")
     )
-    if query_threshold:
+    if query_threshold is not None:
         errors.extend(
             validate_integer_setting(
                 query_threshold, "execution_tracker.query_threshold"
@@ -107,7 +107,7 @@ def execution_tracker(
                     log_message += f"\n  Database Queries: {num_queries} queries "
 
                     # Log query threshold warning separately, if applicable
-                    if query_threshold and num_queries > query_threshold:
+                    if query_threshold is not None and num_queries > query_threshold:
                         log_message += f"(exceeds threshold of ({query_threshold}))"
                         if query_exceed_warning:
                             logger.warning(

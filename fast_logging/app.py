@@ -90,6 +90,13 @@ def setup_logging(
         settings_manager.load(config)
 
     if run_configuration_checks:
+        # Importing the module is what registers the checks, via the
+        # @register() decorators applied at import time. Django got this for
+        # free by importing every app's checks module through the app
+        # registry; here it has to be explicit, and without it the registry
+        # would be empty and run_checks would report nothing.
+        import fast_logging.settings.checks  # noqa: F401  pylint: disable=unused-import
+
         _report_errors(run_checks(None))
 
     # Apply the logging configuration
