@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.abspath(".."))
 
 # -- Project information -----------------------------------------------------
 
-project = "fast_logging"
+project = "fastapi_logging_kit"
 copyright = "2026, Lazarus"
 author = "ARYAN-NIKNEZHAD, MEHRSHAD-MIRSHEKARY"
 

@@ -33,7 +33,7 @@ jobs:
           pip install -r packages/requirements-dev.txt
 
       - name: Run tests with coverage
-        run: pytest --cov=fast_logging --cov-report=xml
+        run: pytest --cov=fastapi_logging_kit --cov-report=xml
 
       - name: Run Tox tests
         run: tox

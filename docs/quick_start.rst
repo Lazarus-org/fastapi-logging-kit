@@ -1,15 +1,15 @@
 Quick Start
 ===========
 
-Getting Started with `fast_logging` is simple. Follow these steps to get up and running quickly:
+Getting Started with `fastapi_logging_kit` is simple. Follow these steps to get up and running quickly:
 
 1. **Install the Package**
 
-   first, Install `fast_logging` via pip:
+   first, Install `fastapi_logging_kit` via pip:
 
 .. code-block:: shell
 
-  $ pip install fast-logging
+  $ pip install fastapi-logging-kit
 
 2. **Call** ``setup_logging``
 
@@ -19,7 +19,7 @@ Getting Started with `fast_logging` is simple. Follow these steps to get up and 
 
   from fastapi import FastAPI
 
-  from fast_logging import setup_logging
+  from fastapi_logging_kit import setup_logging
 
   app = FastAPI()
   setup_logging(app)
@@ -38,7 +38,7 @@ when the server starts, you'll see an initialization message like this in your *
 
 .. code-block:: text
 
-  INFO | 'datetime' | fast_logging | Logging initialized with the following configurations:
+  INFO | 'datetime' | fastapi_logging_kit | Logging initialized with the following configurations:
   Log File levels: ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'].
   Log files are being written to: logs.
   Console output level: DEBUG.
@@ -47,7 +47,7 @@ when the server starts, you'll see an initialization message like this in your *
   Email notifier enabled: False.
   Log rotation type: none.
 
-By default, fast_logging will log each level to its own file:
+By default, fastapi_logging_kit will log each level to its own file:
 
 - DEBUG : ``logs/debug.log``
 - INFO : ``logs/info.log``
@@ -57,4 +57,4 @@ By default, fast_logging will log each level to its own file:
 
 In addition, logs will be displayed in **colorized** mode in the ``console``, making it easier to distinguish between different log levels.
 
-That's it! `fast_logging` is ready to use. For further customization, refer to the :doc:`Settings <settings>`.
+That's it! `fastapi_logging_kit` is ready to use. For further customization, refer to the :doc:`Settings <settings>`.

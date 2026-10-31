@@ -3,7 +3,7 @@ build-backend = "poetry.core.masonry.api"
 requires = [ "poetry-core>=2,<3" ]
 
 [project]
-name = "fast-logging"
+name = "fastapi-logging-kit"
 version = "1.0.0"
 description = "A package for logging in FastAPI applications"
 readme = "README.md"
@@ -35,11 +35,11 @@ classifiers = [
 ]
 
 [project.scripts]
-fast-logging = "fast_logging.commands.cli:main"
+fastapi-logging-kit = "fastapi_logging_kit.commands.cli:main"
 
 [tool.poetry]
 packages = [
-  { include = "fast_logging" },
+  { include = "fastapi_logging_kit" },
 ]
 dependencies.python = ">=3.9,<4.0"
 dependencies.fastapi = ">=0.100,<1.0"
@@ -63,10 +63,10 @@ group.dev.dependencies.python-semantic-release = "^9.8.8"
 group.dev.dependencies.sphinx = "^6.2.1"
 group.dev.dependencies.sphinx-rtd-theme = "^2.0.0"
 group.dev.dependencies.tox = "^4.16.0"
-urls."Source Code" = "https://github.com/lazarus-org/fast-logging"
-urls.Changelog = "https://github.com/lazarus-org/fast-logging/blob/main/CHANGELOG.md"
-urls.Documentation = "https://fast-logging.readthedocs.io"
-urls.Issues = "https://github.com/lazarus-org/fast-logging/issues"
+urls."Source Code" = "https://github.com/lazarus-org/fastapi-logging-kit"
+urls.Changelog = "https://github.com/lazarus-org/fastapi-logging-kit/blob/main/CHANGELOG.md"
+urls.Documentation = "https://fastapi-logging-kit.readthedocs.io"
+urls.Issues = "https://github.com/lazarus-org/fastapi-logging-kit/issues"
 
 [tool.black]
 line-length = 88
@@ -159,7 +159,7 @@ variable-rgx = "[a-z_][a-z0-9_]{2,30}$"
 exclude_dirs = [
   "tests",
 ]
-targets = [ "./fast_logging" ]
+targets = [ "./fastapi_logging_kit" ]
 confidence = "medium"
 exclude_tests = [ "B301", "B302" ]
 include = [ "B101", "B102" ]
@@ -216,7 +216,7 @@ markers = [
   "middleware: Tests related to middleware components in logging.",
   "monitor_log_size_middleware: Tests for middleware that monitors the size of log files.",
   "request_middleware: Tests for middleware handling incoming HTTP requests in logging.",
-  "routers: Tests for the API routers in the fast_logging package.",
+  "routers: Tests for the API routers in the fastapi_logging_kit package.",
   "routers_log_iboard: Tests specially for the log_iboard router.",
   "settings: Tests that ensure logging settings are correctly applied.",
   "settings_checks: Tests for validating the correctness of logging settings.",
@@ -240,7 +240,7 @@ markers = [
 run.omit = [
   "*/tests/*",
 ]
-run.source = [ "fast_logging" ]
+run.source = [ "fastapi_logging_kit" ]
 report.exclude_lines = [
   "def __repr__",
   "if __name__ == .__main__.:",

@@ -1,7 +1,7 @@
 Contributing
 ============
 
-We're excited that you're interested in contributing to `fast_logging`! Whether you're fixing a bug, adding a feature, or improving the project, your help is appreciated.
+We're excited that you're interested in contributing to `fastapi_logging_kit`! Whether you're fixing a bug, adding a feature, or improving the project, your help is appreciated.
 
 Overview
 --------
@@ -19,7 +19,7 @@ Setting Up Your Environment
 
 1. **Fork the Repository:**
 
-   Begin by forking the `fast-logging <https://github.com/lazarus-org/fast-logging>`_ repository on GitHub. This creates your own copy where you can make changes.
+   Begin by forking the `fastapi-logging-kit <https://github.com/lazarus-org/fastapi-logging-kit>`_ repository on GitHub. This creates your own copy where you can make changes.
 
 2. **Clone Your Fork:**
 
@@ -27,8 +27,8 @@ Setting Up Your Environment
 
    .. code-block:: bash
 
-       git clone https://github.com/your-username/fast-logging.git
-       cd fast-logging
+       git clone https://github.com/your-username/fastapi-logging-kit.git
+       cd fastapi-logging-kit
 
 3. **Install Dependencies:**
 
@@ -83,19 +83,19 @@ For linting, ``pylint`` is used to enforce style and catch potential errors:
 
 .. code-block:: bash
 
-    poetry run pylint fast_logging
+    poetry run pylint fastapi_logging_kit
 
 The codebase is fully type annotated and checked with ``mypy``:
 
 .. code-block:: bash
 
-    poetry run mypy fast_logging
+    poetry run mypy fastapi_logging_kit
 
 Security issues are caught with ``bandit``:
 
 .. code-block:: bash
 
-    poetry run bandit -r fast_logging
+    poetry run bandit -r fastapi_logging_kit
 
 Both ``bandit`` and the pre-commit hooks are also available as dedicated ``tox`` environments:
 
@@ -162,7 +162,7 @@ Once your changes are ready, follow these steps to submit them:
 
 3. **Open a Pull Request:**
 
-   Go to the original `fast-logging <https://github.com/lazarus-org/fast-logging>`_ repository and open a pull request. Include a detailed description of your changes and link any related issues.
+   Go to the original `fastapi-logging-kit <https://github.com/lazarus-org/fastapi-logging-kit>`_ repository and open a pull request. Include a detailed description of your changes and link any related issues.
 
 4. **Respond to Feedback:**
 
@@ -175,7 +175,7 @@ Found a bug or have a feature request? We'd love to hear from you!
 
 1. **Open an Issue:**
 
-   Head over to the `Issues <https://github.com/lazarus-org/fast-logging/issues>`_ section of the `fast-logging` repository and click "New Issue".
+   Head over to the `Issues <https://github.com/lazarus-org/fastapi-logging-kit/issues>`_ section of the `fastapi-logging-kit` repository and click "New Issue".
 
 2. **Describe the Problem:**
 
@@ -199,4 +199,4 @@ Here are some additional resources that might be helpful:
 
 ----
 
-Thank you for your interest in contributing to `fast_logging`! We look forward to your contributions.
+Thank you for your interest in contributing to `fastapi_logging_kit`! We look forward to your contributions.

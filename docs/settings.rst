@@ -1,7 +1,7 @@
 Settings
 ========
 
-By default, `fast_logging` uses a built-in configuration that requires no additional setup. However, you can customize the logging settings by passing a configuration mapping to ``setup_logging``, or by setting ``FAST_LOGGING_``-prefixed environment variables.
+By default, `fastapi_logging_kit` uses a built-in configuration that requires no additional setup. However, you can customize the logging settings by passing a configuration mapping to ``setup_logging``, or by setting ``FASTAPI_LOGGING_``-prefixed environment variables.
 
 An explicit mapping passed to ``setup_logging`` takes priority over the environment, which in turn takes priority over the packaged defaults.
 
@@ -9,7 +9,7 @@ An explicit mapping passed to ``setup_logging`` takes priority over the environm
 
     from fastapi import FastAPI
 
-    from fast_logging import setup_logging
+    from fastapi_logging_kit import setup_logging
 
     app = FastAPI()
 
@@ -19,9 +19,9 @@ Environment variables are parsed as JSON, falling back to a plain string:
 
 .. code-block:: shell
 
-    export FAST_LOGGING_LOG_DIR=/var/log/myapp
-    export FAST_LOGGING_LOG_FILE_LEVELS='["INFO", "ERROR"]'
-    export FAST_LOGGING_LOG_CONSOLE_COLORIZE=false
+    export FASTAPI_LOGGING_LOG_DIR=/var/log/myapp
+    export FASTAPI_LOGGING_LOG_FILE_LEVELS='["INFO", "ERROR"]'
+    export FASTAPI_LOGGING_LOG_CONSOLE_COLORIZE=false
 
 .. note::
 
@@ -330,7 +330,7 @@ Here's a breakdown of the available configuration options:
 Available Format Options
 ------------------------
 
-The `fast_logging` package provides predefined log format options that you can use in configuration. Below are the available format options:
+The `fastapi_logging_kit` package provides predefined log format options that you can use in configuration. Below are the available format options:
 
 .. code-block:: python
 
@@ -403,4 +403,4 @@ Keep credentials out of your source tree by supplying them through the environme
 
 .. code-block:: shell
 
-   export FAST_LOGGING_EMAIL='{"EMAIL_HOST":"smtp.example.com","EMAIL_PORT":587,"ADMIN_EMAIL":"admin@example.com"}'
+   export FASTAPI_LOGGING_EMAIL='{"EMAIL_HOST":"smtp.example.com","EMAIL_PORT":587,"ADMIN_EMAIL":"admin@example.com"}'

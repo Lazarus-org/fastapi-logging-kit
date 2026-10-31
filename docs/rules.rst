@@ -1,7 +1,7 @@
 Roles
 =====
 
-The `fast_logging` package provides several logging roles to cater to different logging needs and contexts. These roles define specific behaviors and configurations, making it easier to manage logging in a FastAPI application.
+The `fastapi_logging_kit` package provides several logging roles to cater to different logging needs and contexts. These roles define specific behaviors and configurations, making it easier to manage logging in a FastAPI application.
 
 Available Roles
 ---------------
@@ -34,7 +34,7 @@ Available Roles
 
       from fastapi import FastAPI
 
-      from fast_logging import RequestLogMiddleware, setup_logging
+      from fastapi_logging_kit import RequestLogMiddleware, setup_logging
 
       app = FastAPI()
       setup_logging(app, add_middleware=False)
@@ -56,7 +56,7 @@ Available Roles
 
       import logging
 
-      from fast_logging.utils.log_email_notifier.log_and_notify import log_and_notify_admin
+      from fastapi_logging_kit.utils.log_email_notifier.log_and_notify import log_and_notify_admin
 
       logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ Available Roles
 
       import logging
 
-      from fast_logging.utils.context_manager import config_setup
+      from fastapi_logging_kit.utils.context_manager import config_setup
 
       logger = logging.getLogger(__name__)
 

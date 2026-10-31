@@ -105,5 +105,5 @@ repos:
           - "-rn"
           - "-sn"
           - "--rcfile=pyproject.toml"
-        files: ^fast_logging/
+        files: ^fastapi_logging_kit/
         exclude: (migrations/|tests/|docs/).*

@@ -1,26 +1,26 @@
-# Fast Logging
+# FastAPI Logging Kit
 
-Welcome to fast_logging Documentation!
+Welcome to fastapi_logging_kit Documentation!
 
-![License](https://img.shields.io/github/license/lazarus-org/fast-logging)
-![PyPI release](https://img.shields.io/pypi/v/fast-logging)
-![Documentation](https://img.shields.io/readthedocs/fast-logging)
-![CI Workflow](https://github.com/lazarus-org/fast-logging/actions/workflows/ci.yml/badge.svg)
-![Supported Python versions](https://img.shields.io/pypi/pyversions/fast-logging)
+![License](https://img.shields.io/github/license/lazarus-org/fastapi-logging-kit)
+![PyPI release](https://img.shields.io/pypi/v/fastapi-logging-kit)
+![Documentation](https://img.shields.io/readthedocs/fastapi-logging-kit)
+![CI Workflow](https://github.com/lazarus-org/fastapi-logging-kit/actions/workflows/ci.yml/badge.svg)
+![Supported Python versions](https://img.shields.io/pypi/pyversions/fastapi-logging-kit)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=yellow)](https://github.com/pre-commit/pre-commit)
-![Last Commit](https://img.shields.io/github/last-commit/lazarus-org/fast-logging)
-![Languages](https://img.shields.io/github/languages/top/lazarus-org/fast-logging)
-![Open Issues](https://img.shields.io/github/issues/lazarus-org/fast-logging)
-[![codecov](https://codecov.io/gh/lazarus-org/fast-logging/branch/main/graph/badge.svg)](https://codecov.io/gh/lazarus-org/fast-logging)
+![Last Commit](https://img.shields.io/github/last-commit/lazarus-org/fastapi-logging-kit)
+![Languages](https://img.shields.io/github/languages/top/lazarus-org/fastapi-logging-kit)
+![Open Issues](https://img.shields.io/github/issues/lazarus-org/fastapi-logging-kit)
+[![codecov](https://codecov.io/gh/lazarus-org/fastapi-logging-kit/branch/main/graph/badge.svg)](https://codecov.io/gh/lazarus-org/fastapi-logging-kit)
 [![pylint](https://img.shields.io/badge/pylint-10/10-brightgreen?logo=python&logoColor=blue)](https://www.pylint.org/)
 
-The [`fast_logging`](https://github.com/lazarus-org/fast-logging) is a powerful yet simple FastAPI package that extends and enhances Python's built-in ``logging`` without relying on any **third-party** logging libraries. Our goal is to keep things straightforward while providing flexible and customizable logging solutions that are specifically designed for FastAPI applications.
+The [`fastapi_logging_kit`](https://github.com/lazarus-org/fastapi-logging-kit) is a powerful yet simple FastAPI package that extends and enhances Python's built-in ``logging`` without relying on any **third-party** logging libraries. Our goal is to keep things straightforward while providing flexible and customizable logging solutions that are specifically designed for FastAPI applications.
 
-One of the key advantages of ``fast_logging`` is its seamless integration. Get started with fast_logging in your existing projects without refactoring any code. Even if you're already using the **built-in logging module**, you can instantly upgrade to advanced features with just a simple installation. No extra changes or complicated setup required!
+One of the key advantages of ``fastapi_logging_kit`` is its seamless integration. Get started with fastapi_logging_kit in your existing projects without refactoring any code. Even if you're already using the **built-in logging module**, you can instantly upgrade to advanced features with just a simple installation. No extra changes or complicated setup required!
 
-imagine you have a FastAPI service that was developed a few years ago and already uses Python's built-in ``logging``. Refactoring the entire codebase to use another logging package would be a daunting task. But with ``fast_logging``, you don't have to worry about that. Simply install fast_logging, call ``setup_logging(app)`` once, and enjoy all its advanced features with logging each ``LEVEL`` in separate files with three extra formats (``json``, ``xml``, ``flat``) **without having to make any changes** to your existing code.
+imagine you have a FastAPI service that was developed a few years ago and already uses Python's built-in ``logging``. Refactoring the entire codebase to use another logging package would be a daunting task. But with ``fastapi_logging_kit``, you don't have to worry about that. Simply install fastapi_logging_kit, call ``setup_logging(app)`` once, and enjoy all its advanced features with logging each ``LEVEL`` in separate files with three extra formats (``json``, ``xml``, ``flat``) **without having to make any changes** to your existing code.
 
-`fast_logging` is a port of [`django_logging`](https://github.com/lazarus-org/django_logging). If you are coming from that package, see [Migrating from django_logging](#migrating-from-django_logging) for the mapping between the two.
+`fastapi_logging_kit` is a port of [`django_logging`](https://github.com/lazarus-org/django_logging). If you are coming from that package, see [Migrating from django_logging](#migrating-from-django_logging) for the mapping between the two.
 
 
 ## Project Detail
@@ -46,14 +46,14 @@ The documentation is organized into the following sections:
 
 ## Quick Start
 
-Getting started with `fast_logging` is simple. Follow these steps to get up and running quickly:
+Getting started with `fastapi_logging_kit` is simple. Follow these steps to get up and running quickly:
 
 1. **Install the Package**
 
-first, Install `fast_logging` via pip:
+first, Install `fastapi_logging_kit` via pip:
 
 ```shell
-$ pip install fast-logging
+$ pip install fastapi-logging-kit
 ```
 
 2. **Call `setup_logging`**
@@ -63,7 +63,7 @@ FastAPI has no application registry, so there is no equivalent of Django's `INST
 ```python
 from fastapi import FastAPI
 
-from fast_logging import setup_logging
+from fastapi_logging_kit import setup_logging
 
 app = FastAPI()
 setup_logging(app)
@@ -82,7 +82,7 @@ uvicorn main:app --reload
 when the server starts, you'll see an initialization message like this in your *console*:
 
 ```shell
-INFO | 'datetime' | fast_logging | Logging initialized with the following configurations:
+INFO | 'datetime' | fastapi_logging_kit | Logging initialized with the following configurations:
 Log File levels: ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'].
 Log files are being written to: logs.
 Console output level: DEBUG.
@@ -92,7 +92,7 @@ Email notifier enabled: False.
 Log rotation type: none.
 ```
 
-By default, fast_logging will log each level to its own file:
+By default, fastapi_logging_kit will log each level to its own file:
 - DEBUG : `logs/debug.log`
 - INFO : `logs/info.log`
 - WARNING : `logs/warning.log`
@@ -101,16 +101,16 @@ By default, fast_logging will log each level to its own file:
 
 In addition, logs will be displayed in ***colorized*** mode in the `console`, making it easier to distinguish between different log levels.
 
-That's it! `fast_logging` is ready to use. For further customization, refer to the [Settings](#settings) section.
+That's it! `fastapi_logging_kit` is ready to use. For further customization, refer to the [Settings](#settings) section.
 
 
 ## Usage
 
-Once `fast_logging` is installed and `setup_logging` has been called, you can start using it right away. The package provides several features to customize and enhance logging in your FastAPI project. Below is a guide on how to use the various features provided by `fast_logging`.
+Once `fastapi_logging_kit` is installed and `setup_logging` has been called, you can start using it right away. The package provides several features to customize and enhance logging in your FastAPI project. Below is a guide on how to use the various features provided by `fastapi_logging_kit`.
 
 ### Basic Logging Usage:
 
-At its core, `fast_logging` is built on top of Python's built-in logging module. This means you can use the standard logging module to log messages across your project. Here's a basic example of logging usage:
+At its core, `fastapi_logging_kit` is built on top of Python's built-in logging module. This means you can use the standard logging module to log messages across your project. Here's a basic example of logging usage:
 
 ```python
 import logging
@@ -124,7 +124,7 @@ logger.error("This is an error message")
 logger.critical("This is a critical message")
 ```
 
-These logs will be handled according to the configurations set up by `fast_logging`, using either the default settings or any custom settings you've provided.
+These logs will be handled according to the configurations set up by `fastapi_logging_kit`, using either the default settings or any custom settings you've provided.
 
 ### Configuring
 
@@ -133,7 +133,7 @@ These logs will be handled according to the configurations set up by `fast_loggi
 ```python
 from fastapi import FastAPI
 
-from fast_logging import setup_logging
+from fastapi_logging_kit import setup_logging
 
 app = FastAPI()
 
@@ -147,33 +147,33 @@ setup_logging(
 )
 ```
 
-Every option can also be supplied through the environment, using the `FAST_LOGGING_` prefix. Values are parsed as JSON, falling back to a plain string:
+Every option can also be supplied through the environment, using the `FASTAPI_LOGGING_` prefix. Values are parsed as JSON, falling back to a plain string:
 
 ```shell
-export FAST_LOGGING_LOG_DIR=/var/log/myapp
-export FAST_LOGGING_LOG_FILE_LEVELS='["INFO", "ERROR"]'
-export FAST_LOGGING_LOG_CONSOLE_COLORIZE=false
+export FASTAPI_LOGGING_LOG_DIR=/var/log/myapp
+export FASTAPI_LOGGING_LOG_FILE_LEVELS='["INFO", "ERROR"]'
+export FASTAPI_LOGGING_LOG_CONSOLE_COLORIZE=false
 ```
 
-An explicit mapping passed to `setup_logging` takes priority over the environment, which in turn takes priority over the packaged defaults. This means the CLI commands pick up the same `FAST_LOGGING_LOG_DIR` your application uses, with no extra wiring.
+An explicit mapping passed to `setup_logging` takes priority over the environment, which in turn takes priority over the packaged defaults. This means the CLI commands pick up the same `FASTAPI_LOGGING_LOG_DIR` your application uses, with no extra wiring.
 
 `setup_logging` can also be called without an application when you only want the logging configured — for example in a worker process or a maintenance script:
 
 ```python
-from fast_logging import setup_logging
+from fastapi_logging_kit import setup_logging
 
 setup_logging(config={"LOG_DIR": "logs"})
 ```
 
 ### Context Manager:
 
-You can use the `config_setup` context manager to temporarily apply `fast_logging` configurations within a specific block of code.
+You can use the `config_setup` context manager to temporarily apply `fastapi_logging_kit` configurations within a specific block of code.
 Example usage:
 
 ```python
 import logging
 
-from fast_logging.utils.context_manager import config_setup
+from fastapi_logging_kit.utils.context_manager import config_setup
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +198,7 @@ To send specific logs as email, use the `log_and_notify_admin` function. Ensure 
 ```python
 import logging
 
-from fast_logging.utils.log_email_notifier.log_and_notify import log_and_notify_admin
+from fastapi_logging_kit.utils.log_email_notifier.log_and_notify import log_and_notify_admin
 
 logger = logging.getLogger(__name__)
 
@@ -225,7 +225,7 @@ The `execution_tracker` decorator logs the execution time and, optionally, the n
 ```python
 import logging
 
-from fast_logging.decorators import execution_tracker
+from fastapi_logging_kit.decorators import execution_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -250,12 +250,12 @@ def some_function():
 
 **Tracking queries**
 
-Django counted queries automatically through `connection.queries`. FastAPI ships no ORM, so `fast_logging` keeps its own per-context query log. If you use SQLAlchemy, instrument your engine once at startup:
+Django counted queries automatically through `connection.queries`. FastAPI ships no ORM, so `fastapi_logging_kit` keeps its own per-context query log. If you use SQLAlchemy, instrument your engine once at startup:
 
 ```python
 from sqlalchemy import create_engine
 
-from fast_logging import instrument_sqlalchemy
+from fastapi_logging_kit import instrument_sqlalchemy
 
 engine = create_engine("postgresql://...")
 instrument_sqlalchemy(engine)
@@ -264,7 +264,7 @@ instrument_sqlalchemy(engine)
 Using a different database library? Report queries yourself from your own instrumentation:
 
 ```python
-from fast_logging import record_query
+from fastapi_logging_kit import record_query
 
 record_query("SELECT * FROM users", duration=0.014)
 ```
@@ -276,7 +276,7 @@ record_query("SELECT * FROM users", duration=0.014)
 ```python
 from fastapi import FastAPI
 
-from fast_logging import RequestLogMiddleware, setup_logging
+from fastapi_logging_kit import RequestLogMiddleware, setup_logging
 
 app = FastAPI()
 setup_logging(app, add_middleware=False)
@@ -339,7 +339,7 @@ async def list_items():
 The "last run" timestamp is kept in a small in-process cache. If you run several workers and want them to share it, install your own backend:
 
 ```python
-from fast_logging import set_cache
+from fastapi_logging_kit import set_cache
 
 set_cache(my_redis_backed_cache)  # any object with .get(key, default) and .set(key, value, timeout)
 ```
@@ -348,14 +348,14 @@ set_cache(my_redis_backed_cache)  # any object with .get(key, default) and .set(
 
 ### Context Variable Management
 
-`fast_logging` exposes the context manager used internally, so you can attach your own fields to every log record in a block of code.
+`fastapi_logging_kit` exposes the context manager used internally, so you can attach your own fields to every log record in a block of code.
 
 #### Binding and Unbinding Context Variables
 
 ```python
 import logging
 
-from fast_logging import manager
+from fastapi_logging_kit import manager
 
 logger = logging.getLogger(__name__)
 
@@ -376,7 +376,7 @@ manager.clear()
 `batch_bind` returns tokens you can use to restore the previous values:
 
 ```python
-from fast_logging import manager
+from fastapi_logging_kit import manager
 
 tokens = manager.batch_bind(request_id="abc", stage="validate")
 try:
@@ -388,7 +388,7 @@ finally:
 #### Retrieving and Merging Context Variables
 
 ```python
-from fast_logging import manager
+from fastapi_logging_kit import manager
 
 manager.get_contextvars()  # {'request_id': 'abc'}
 manager.get_merged_context({"extra": "value"})  # bound logger context wins over ambient
@@ -399,7 +399,7 @@ manager.get_merged_context({"extra": "value"})  # bound logger context wins over
 The cleanest option is `scoped_context`, which binds for the duration of a block and restores afterwards — even if the block raises:
 
 ```python
-from fast_logging import manager
+from fastapi_logging_kit import manager
 
 with manager.scoped_context(job_id="import-42"):
     run_import()  # every log record inside carries job_id
@@ -418,14 +418,14 @@ LogiBoard lets you upload and browse log files in the browser.
 setup_logging(app, {"INCLUDE_LOG_iBOARD": True})
 ```
 
-That registers the page at `/log-iboard/` and mounts its assets at `/fast-logging/static`.
+That registers the page at `/log-iboard/` and mounts its assets at `/fastapi-logging-kit/static`.
 
 2. Restrict access.
 
 FastAPI has no permission framework, so access is controlled by a predicate you can replace. The default reads `is_superuser` from `scope["user"]` and **denies anonymous requests**, which matches how Django's `AnonymousUser` failed the same check. Install your own rule with `set_permission_check`:
 
 ```python
-from fast_logging.routers import set_permission_check
+from fastapi_logging_kit.routers import set_permission_check
 
 
 def only_admins(request) -> bool:
@@ -445,7 +445,7 @@ Visit `/log-iboard/` and upload a `.zip` of your logs. LogiBoard renders the dir
 
 ## Settings
 
-By default, `fast_logging` uses a built-in configuration that requires no additional setup. However, you can customize the logging settings by passing a configuration mapping to `setup_logging`, or by setting `FAST_LOGGING_`-prefixed environment variables.
+By default, `fastapi_logging_kit` uses a built-in configuration that requires no additional setup. However, you can customize the logging settings by passing a configuration mapping to `setup_logging`, or by setting `FASTAPI_LOGGING_`-prefixed environment variables.
 
 #### Default configuration:
 
@@ -663,7 +663,7 @@ Here's a breakdown of the available configuration options:
 
 ## Log Rotation
 
-By default `fast_logging` writes to plain files that grow forever. Rotation is opt-in through `LOG_ROTATION`, and can be overridden per level with `LOG_ROTATION_OVERRIDES`.
+By default `fastapi_logging_kit` writes to plain files that grow forever. Rotation is opt-in through `LOG_ROTATION`, and can be overridden per level with `LOG_ROTATION_OVERRIDES`.
 
 `LOG_ROTATION`
 --------------
@@ -733,10 +733,10 @@ setup_logging(
 
 ## CLI Commands
 
-FastAPI projects have no `manage.py`, so the commands ship as a `fast-logging` console script. Every command reads the same configuration your application does, so `FAST_LOGGING_LOG_DIR` applies here too:
+FastAPI projects have no `manage.py`, so the commands ship as a `fastapi-logging-kit` console script. Every command reads the same configuration your application does, so `FASTAPI_LOGGING_LOG_DIR` applies here too:
 
 ```shell
-$ fast-logging --help
+$ fastapi-logging-kit --help
 ```
 
 ### send-logs
@@ -744,7 +744,7 @@ $ fast-logging --help
 Zips the log directory and emails it to the given address.
 
 ```shell
-$ fast-logging send-logs ops@example.com
+$ fastapi-logging-kit send-logs ops@example.com
 ```
 
 #### Key Features:
@@ -760,7 +760,7 @@ $ fast-logging send-logs ops@example.com
 Reports the size of the log directory, broken down by category, and emails the admin when it exceeds `LOG_DIR_SIZE_LIMIT`.
 
 ```shell
-$ fast-logging logs-size-audit
+$ fastapi-logging-kit logs-size-audit
 ```
 
 #### Example:
@@ -781,7 +781,7 @@ Log directory size is under the limit: 276.4 MB
 Immediately rotates every active rotating handler. Useful in a deploy script, so a new process starts on fresh files.
 
 ```shell
-$ fast-logging rotate-logs
+$ fastapi-logging-kit rotate-logs
 ```
 
 Plain `FileHandler` instances cannot be rotated programmatically; they are reported as skipped rather than failing.
@@ -792,22 +792,22 @@ Moves rotated (non-active) log files into a timestamped `archive/` subdirectory,
 
 ```shell
 # Basic — move rotated files into archive/
-$ fast-logging archive-logs
+$ fastapi-logging-kit archive-logs
 
 # Gzip each file before moving
-$ fast-logging archive-logs --compress
+$ fastapi-logging-kit archive-logs --compress
 
 # Bundle the archive directory into a tar.gz and remove it
-$ fast-logging archive-logs --bundle tar.gz
+$ fastapi-logging-kit archive-logs --bundle tar.gz
 
 # Bundle into a zip file
-$ fast-logging archive-logs --bundle zip
+$ fastapi-logging-kit archive-logs --bundle zip
 
 # Compress individual files and then bundle into tar.gz
-$ fast-logging archive-logs --compress --bundle tar.gz
+$ fastapi-logging-kit archive-logs --compress --bundle tar.gz
 
 # Preview everything without touching any files
-$ fast-logging archive-logs --dry-run
+$ fastapi-logging-kit archive-logs --dry-run
 ```
 
 #### Arguments:
@@ -823,7 +823,7 @@ Active `<level>.log` files are never touched.
 Finds the `.json` files in `logs/json/` and rewrites them as valid, pretty-printed JSON arrays under `logs/json/pretty/`.
 
 ```shell
-$ fast-logging generate-pretty-json
+$ fastapi-logging-kit generate-pretty-json
 ```
 
 ### generate-pretty-xml
@@ -831,13 +831,13 @@ $ fast-logging generate-pretty-json
 Finds the `.xml` files in `logs/xml/` and wraps their contents in a single `<logs>` element under `logs/xml/pretty/`.
 
 ```shell
-$ fast-logging generate-pretty-xml
+$ fastapi-logging-kit generate-pretty-xml
 ```
 
 
 ## Available Format Options
 
-The `fast_logging` package provides predefined log format options that you can use in configuration. You can reference these formats by their corresponding **integer keys**.
+The `fastapi_logging_kit` package provides predefined log format options that you can use in configuration. You can reference these formats by their corresponding **integer keys**.
 
 ```
 1.  "%(levelname)s | %(asctime)s | %(module)s | %(message)s | %(context)s"
@@ -892,22 +892,22 @@ These settings ensure that the email notifier is correctly configured to send lo
 Keep credentials out of your source tree by supplying them through the environment instead:
 
 ```shell
-export FAST_LOGGING_EMAIL='{"EMAIL_HOST":"smtp.example.com","EMAIL_PORT":587,"ADMIN_EMAIL":"admin@example.com"}'
+export FASTAPI_LOGGING_EMAIL='{"EMAIL_HOST":"smtp.example.com","EMAIL_PORT":587,"ADMIN_EMAIL":"admin@example.com"}'
 ```
 
 
 ## Migrating from django_logging
 
-`fast_logging` keeps the same configuration keys, formats and behaviour. What changes is how the package attaches to your application:
+`fastapi_logging_kit` keeps the same configuration keys, formats and behaviour. What changes is how the package attaches to your application:
 
-| django_logging | fast_logging |
+| django_logging | fastapi_logging_kit |
 | --- | --- |
 | Add `"django_logging"` to `INSTALLED_APPS` | Call `setup_logging(app)` |
-| `DJANGO_LOGGING = {...}` in settings | A mapping passed to `setup_logging`, or `FAST_LOGGING_*` env vars |
+| `DJANGO_LOGGING = {...}` in settings | A mapping passed to `setup_logging`, or `FASTAPI_LOGGING_*` env vars |
 | Top-level `EMAIL_HOST`, `ADMIN_EMAIL`, … settings | The `EMAIL` configuration key |
 | `settings.DEBUG` | The `DEBUG` configuration key |
 | `MIDDLEWARE` list entries | Installed by `setup_logging`, or `app.add_middleware(...)` |
-| `python manage.py send_logs` | `fast-logging send-logs` |
+| `python manage.py send_logs` | `fastapi-logging-kit send-logs` |
 | Django system checks abort startup | Check failures are logged as warnings; the app still boots |
 | `connection.queries` | `instrument_sqlalchemy(engine)` or `record_query(...)` |
 | `request.user` | `scope["user"]` |
