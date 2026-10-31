@@ -228,6 +228,16 @@ def validate_email_notifier(notifier_config: LogEmailNotifier) -> List[Error]:
             errors.extend(validate_boolean_setting(bool(value), config_name))
         elif isinstance(value, (int, str)) and key == "LOG_FORMAT":
             errors.extend(validate_format_option(value, config_name))
+        elif key in ("MAX_CONCURRENT", "SMTP_TIMEOUT"):
+            maximum = 64 if key == "MAX_CONCURRENT" else 120
+            if type(value) is not int or not 1 <= value <= maximum:
+                errors.append(
+                    Error(
+                        f"{config_name} must be an integer between 1 and {maximum}.",
+                        hint="Supply a bounded positive integer.",
+                        id=f"fastapi_logging_kit.E018_{config_name}",
+                    )
+                )
 
         else:
             errors.append(

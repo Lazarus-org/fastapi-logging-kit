@@ -8,8 +8,56 @@ from smtplib import SMTP
 from typing import List, Optional
 
 from fastapi_logging_kit.utils.get_conf import get_email_setting
+from fastapi_logging_kit.settings import settings_manager
 
 logger = logging.getLogger(__name__)
+
+
+_MAX_CONCURRENT_DEFAULT = 4
+_TIMEOUT_DEFAULT = 10
+_limiter_lock = threading.Lock()
+_limiter_pid: int | None = None
+_limiter_capacity: int | None = None
+_limiter: threading.BoundedSemaphore | None = None
+
+
+def _options() -> tuple[int, int]:
+    """Load resource bounds independently of the external settings module."""
+    values = settings_manager.email_notifier
+    if not isinstance(values, dict):
+        values = {}
+    concurrent = values.get("MAX_CONCURRENT", _MAX_CONCURRENT_DEFAULT)
+    timeout = values.get("SMTP_TIMEOUT", _TIMEOUT_DEFAULT)
+    if type(concurrent) is not int or not 1 <= concurrent <= 64:
+        raise ValueError("LOG_EMAIL_NOTIFIER.MAX_CONCURRENT must be an integer from 1 to 64")
+    if type(timeout) is not int or not 1 <= timeout <= 120:
+        raise ValueError("LOG_EMAIL_NOTIFIER.SMTP_TIMEOUT must be an integer from 1 to 120")
+    return concurrent, timeout
+
+
+def _semaphore(capacity: int) -> threading.BoundedSemaphore:
+    """Return a per-process capacity semaphore, reset when settings change."""
+    global _limiter, _limiter_pid, _limiter_capacity
+    with _limiter_lock:
+        pid = os.getpid()
+        if _limiter_pid != pid or _limiter is None or _limiter_capacity != capacity:
+            _limiter = threading.BoundedSemaphore(capacity)
+            _limiter_pid = pid
+            _limiter_capacity = capacity
+        return _limiter
+
+
+def _after_fork() -> None:
+    """Discard lock/semaphore inherited from a prefork server."""
+    global _limiter_lock, _limiter, _limiter_pid, _limiter_capacity
+    _limiter_lock = threading.Lock()
+    _limiter = None
+    _limiter_pid = os.getpid()
+    _limiter_capacity = None
+
+
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=_after_fork)
 
 
 def _deliver(msg: MIMEMultipart, recipient_list: List[str]) -> None:
@@ -20,7 +68,11 @@ def _deliver(msg: MIMEMultipart, recipient_list: List[str]) -> None:
         recipient_list (List[str]): The addresses to deliver to.
 
     """
-    server = SMTP(get_email_setting("EMAIL_HOST"), get_email_setting("EMAIL_PORT"))
+    server = SMTP(
+        get_email_setting("EMAIL_HOST"),
+        get_email_setting("EMAIL_PORT"),
+        timeout=_options()[1],
+    )
     try:
         if get_email_setting("EMAIL_USE_TLS", True):
             server.starttls()
@@ -80,42 +132,46 @@ def send_email_async(
     body: str,
     recipient_list: List[str],
     event: Optional[threading.Event] = None,
-) -> None:
-    """Send an HTML email in a background thread.
+) -> bool:
+    """Attempt best-effort delivery without spawning unbounded threads.
 
-    The SMTP credentials are read from the ``EMAIL`` block of the
-    ``fastapi_logging_kit`` configuration rather than from Django settings.
-
-    Args:
-        subject (str): The email subject line.
-        body (str): The HTML body of the email.
-        recipient_list (List[str]): The addresses to deliver to.
-        event (Optional[threading.Event]): Set once the send attempt
-            finishes. Used by the tests to wait for the worker thread.
-
+    Returns ``False`` when saturated. SMTP is never treated as a durable queue.
     """
+    capacity, _timeout = _options()
+    slot = _semaphore(capacity)
+    if not slot.acquire(blocking=False):
+        logger.warning("Email notifier at capacity; dropping notification")
+        if event is not None:
+            event.set()
+        return False
 
     def send_email() -> None:
-        from_email = get_email_setting("DEFAULT_FROM_EMAIL")
-
-        msg = MIMEMultipart()
-        msg["From"] = from_email
-        msg["To"] = ", ".join(recipient_list)
-        msg["Subject"] = subject
-
-        msg.attach(MIMEText(body, "html"))
-
         try:
+            from_email = get_email_setting("DEFAULT_FROM_EMAIL")
+            msg = MIMEMultipart()
+            msg["From"] = from_email
+            msg["To"] = ", ".join(recipient_list)
+            msg["Subject"] = subject
+            msg.attach(MIMEText(body, "html"))
             _deliver(msg, recipient_list)
             logger.info("The Record has been sent to ADMIN EMAIL successfully.")
-
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.warning("Email Notifier failed to send the Record: %s", e)
-
+        except Exception as exc:
+            logger.warning("Email Notifier failed to send the Record: %s", exc)
         finally:
-            if event:
-                event.set()  # set event that waits until email send. (used for Tests)
+            slot.release()
+            if event is not None:
+                event.set()
 
-    # Start a new thread to send the email asynchronously
-    email_thread = threading.Thread(target=send_email)
-    email_thread.start()
+    try:
+        worker = threading.Thread(
+            target=send_email,
+            name="fastapi-logging-kit-email",
+            daemon=True,
+        )
+        worker.start()
+    except Exception:
+        slot.release()
+        if event is not None:
+            event.set()
+        raise
+    return True

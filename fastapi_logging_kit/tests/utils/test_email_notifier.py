@@ -35,7 +35,7 @@ class TestSendEmailAsync:
         send_email_async("Subject", "<p>body</p>", ["admin@example.com"], event)
         assert event.wait(timeout=5)
 
-        mock_smtp.assert_called_once_with("smtp.example.com", 587)
+        mock_smtp.assert_called_once_with("smtp.example.com", 587, timeout=10)
         server = mock_smtp.return_value
         server.starttls.assert_called_once()
         server.login.assert_called_once_with("user@example.com", "password")

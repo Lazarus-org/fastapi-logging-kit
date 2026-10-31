@@ -34,6 +34,8 @@ class LogEmailNotifier(TypedDict, total=False):
     NOTIFY_CRITICAL: bool
     LOG_FORMAT: FormatOption
     USE_TEMPLATE: bool
+    MAX_CONCURRENT: int
+    SMTP_TIMEOUT: int
 
 
 class LogFileFormats(TypedDict, total=False):
