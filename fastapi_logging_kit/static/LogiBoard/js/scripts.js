@@ -1,7 +1,7 @@
 const mainupload = document.getElementById("main-upload");
 const dropZone = document.getElementById('drop-zone');
 
-let folderTree = {};
+let folderTree = Object.create(null);
 let interval;
 let progress = 0;
 let isStopped = false;
@@ -57,7 +57,7 @@ dropZone.addEventListener('drop', (e) => {
 function uploadFile(file) {
     document.getElementById('drag-drop-area').style.display = "none";
     document.getElementById('upload-area').style.display = "flex";
-    folderTree = {};
+    folderTree = Object.create(null);
     document.getElementById('file-structure').innerHTML = '';
     document.getElementById('file-display').innerHTML = '';
     currentFile = file;
@@ -81,19 +81,48 @@ function updateProgressUI(progress) {
     document.getElementById('progress-text').textContent = `${progress}%`;
 }
 
+function buildFolderTree(fileNames) {
+    const root = Object.create(null);
+
+    fileNames.forEach((fileName) => {
+        const parts = fileName.split('/').filter(Boolean);
+        let currentFolder = root;
+
+        parts.forEach((part, index) => {
+            const isLastPart = index === parts.length - 1;
+            const hasPart = Object.prototype.hasOwnProperty.call(currentFolder, part);
+
+            if (isLastPart) {
+                if (!hasPart) currentFolder[part] = null;
+                return;
+            }
+
+            if (!hasPart || currentFolder[part] === null) {
+                currentFolder[part] = Object.create(null);
+            }
+            currentFolder = currentFolder[part];
+        });
+    });
+
+    return root;
+}
+
 function extractZip(file) {
     const reader = new FileReader();
-    reader.onload = (event) => {
-        JSZip.loadAsync(event.target.result).then((zip) => {
+    reader.onerror = () => {
+        alert('Unable to read the selected ZIP file.');
+        resetAll();
+    };
+    reader.onload = async (event) => {
+        try {
+            const zip = await JSZip.loadAsync(event.target.result);
             const fileStructure = document.getElementById('file-structure');
-            Object.keys(zip.files).forEach((fileName) => {
-                let currentFolder = folderTree;
-                fileName.split('/').forEach((part, index, arr) => {
-                    currentFolder = currentFolder[part] = (index === arr.length - 1) ? null : currentFolder[part] || {};
-                });
-            });
+            folderTree = buildFolderTree(Object.keys(zip.files));
             displayFolderContents(folderTree, fileStructure, zip, []);
-        });
+        } catch (error) {
+            alert('Unable to open this ZIP file. Please select a valid archive.');
+            resetAll();
+        }
     };
     reader.readAsArrayBuffer(file);
 }
@@ -112,7 +141,7 @@ function displayFolderContents(folder, container, zip, path) {
     container.innerHTML = '';
     if (path.length) {
         const backButton = document.createElement('div');
-        backButton.innerHTML = `<span class="inline-block text-lg mr-2">&larr;</span>Back`;
+        backButton.textContent = '← Back';
         backButton.classList.add('cursor-pointer', 'text-gray-500', 'mb-4', 'flex', 'items-center', 'text-sm');
         backButton.addEventListener('click', () => {
             const parentFolder = path.slice(0, -1).reduce((acc, part) => acc[part], folderTree);
@@ -127,7 +156,12 @@ function displayFolderContents(folder, container, zip, path) {
             const isFile = folder[item] === null;
             const fileElement = document.createElement('div');
             fileElement.classList.add('cursor-pointer', isFile ? 'text-blue-300' : 'text-yellow-300', 'mb-2');
-            fileElement.innerHTML = `<img src="${icons[isFile ? getIcon(item) : 'folder']}" class="inline-block w-5 h-5 mr-2" alt="">${item}`;
+            const icon = document.createElement('img');
+            icon.src = icons[isFile ? getIcon(item) : 'folder'];
+            icon.className = 'inline-block w-5 h-5 mr-2';
+            icon.alt = '';
+            fileElement.appendChild(icon);
+            fileElement.appendChild(document.createTextNode(item));
 
             fileElement.addEventListener('click', async () => {
 

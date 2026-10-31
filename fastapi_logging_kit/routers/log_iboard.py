@@ -12,6 +12,8 @@ fail the same check.
 
 """
 
+import inspect
+from threading import RLock
 from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Request
@@ -20,7 +22,7 @@ from starlette.staticfiles import StaticFiles
 
 from fastapi_logging_kit.templating import STATIC_DIR, STATIC_URL_PREFIX, render_to_string
 
-PermissionCheck = Callable[[Any], bool]
+PermissionCheck = Callable[[Request], bool]
 
 router = APIRouter(tags=["fastapi-logging-kit"])
 
@@ -43,29 +45,56 @@ def default_permission_check(request: Request) -> bool:
 
 
 _permission_check: PermissionCheck = default_permission_check
+_permission_lock = RLock()
 
 
-def set_permission_check(check: Optional[PermissionCheck]) -> None:
-    """Replace the predicate deciding who may view LogiBoard.
+def set_permission_check(
+    check: Optional[PermissionCheck], *, app: Optional[Any] = None
+) -> None:
+    """Set a process-wide or application-scoped LogiBoard permission predicate.
 
-    Args:
-        check (Optional[PermissionCheck]): A callable taking the request
-            and returning True to allow access. Passing ``None`` restores
-            the default superuser check.
-
+    The callback must be synchronous and return a real ``bool``; invalid or
+    awaitable results fail closed. Passing ``app`` isolates the policy to that
+    FastAPI application. Without it, the process-wide default is updated.
+    Passing ``None`` restores the default predicate (or the process-wide policy
+    for an app override).
     """
+    if check is not None and not callable(check):
+        raise TypeError("permission check must be callable or None")
+    if check is not None and (
+        inspect.iscoroutinefunction(check)
+        or inspect.iscoroutinefunction(getattr(check, "__call__", None))
+    ):
+        raise TypeError("LogiBoard permission checks must be synchronous")
+    if app is not None:
+        app.state._fastapi_logging_kit_permission_check = check
+        return
+
     global _permission_check  # pylint: disable=global-statement
-    _permission_check = check if check is not None else default_permission_check
+    with _permission_lock:
+        _permission_check = check if check is not None else default_permission_check
 
 
-def get_permission_check() -> PermissionCheck:
-    """Return the predicate currently guarding LogiBoard.
+def get_permission_check(app: Optional[Any] = None) -> PermissionCheck:
+    """Return the permission predicate for *app* or the process default."""
+    if app is not None:
+        app_check = getattr(app.state, "_fastapi_logging_kit_permission_check", None)
+        if app_check is not None:
+            return app_check
+    with _permission_lock:
+        return _permission_check
 
-    Returns:
-        PermissionCheck: The active permission check.
 
-    """
-    return _permission_check
+def _permission_is_allowed(request: Request) -> bool:
+    """Evaluate the synchronous permission predicate without fail-open results."""
+    result = get_permission_check(request.app)(request)
+    if inspect.isawaitable(result):
+        if inspect.iscoroutine(result):
+            result.close()
+        raise TypeError("LogiBoard permission checks must return bool synchronously")
+    if not isinstance(result, bool):
+        raise TypeError("LogiBoard permission checks must return bool synchronously")
+    return result
 
 
 @router.get("/log-iboard/", response_class=HTMLResponse, name="log-iboard")
@@ -82,7 +111,7 @@ async def log_iboard(request: Request) -> HTMLResponse:
         HTMLResponse: The rendered LogiBoard page, or a 403 error page.
 
     """
-    if _permission_check(request):
+    if _permission_is_allowed(request):
         return HTMLResponse(render_to_string("log_iboard.html"))
 
     return HTMLResponse(
@@ -98,12 +127,29 @@ async def log_iboard(request: Request) -> HTMLResponse:
 
 
 def mount_static(app: Any) -> None:
-    """Mount the packaged LogiBoard static assets on *app*.
+    """Mount the packaged LogiBoard assets once on *app*.
 
-    Args:
-        app (Any): The FastAPI application to mount the assets on.
-
+    Repeated setup calls are harmless. An application-owned route already
+    occupying the package's static URL is treated as a configuration conflict
+    rather than silently shadowed.
     """
+    routes = getattr(app, "routes", ())
+    for route in routes:
+        route_name = getattr(route, "name", None)
+        route_path = getattr(route, "path", None)
+        if route_name == "fastapi-logging-kit-static":
+            if route_path == STATIC_URL_PREFIX:
+                return
+            raise RuntimeError(
+                "The route named 'fastapi-logging-kit-static' is registered at an "
+                f"unexpected path: {route_path!r}."
+            )
+        if route_path == STATIC_URL_PREFIX:
+            raise RuntimeError(
+                f"Cannot mount LogiBoard assets: {STATIC_URL_PREFIX!r} "
+                "is already registered by another route."
+            )
+
     app.mount(
         STATIC_URL_PREFIX,
         StaticFiles(directory=STATIC_DIR),

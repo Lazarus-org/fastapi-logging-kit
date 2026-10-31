@@ -132,6 +132,48 @@ class TestPermissionCheckRegistry:
         assert get_permission_check() is default_permission_check
 
 
+    def test_permission_check_can_be_scoped_to_an_application(self) -> None:
+        """Test that applications can use independent access policies."""
+        app = FastAPI()
+
+        def allow_app(request: Request) -> bool:
+            return True
+
+        set_permission_check(allow_app, app=app)
+
+        assert get_permission_check(app) is allow_app
+        assert get_permission_check() is default_permission_check
+
+    def test_clearing_application_override_restores_global_policy(self) -> None:
+        """Test that clearing an app override falls back to the process policy."""
+        app = FastAPI()
+
+        def process_check(request: Request) -> bool:
+            return True
+
+        def app_check(request: Request) -> bool:
+            return False
+
+        set_permission_check(process_check)
+        set_permission_check(app_check, app=app)
+        set_permission_check(None, app=app)
+
+        assert get_permission_check(app) is process_check
+
+    def test_rejects_non_callable_permission_check(self) -> None:
+        """Test that invalid permission callbacks fail immediately."""
+        with pytest.raises(TypeError, match="must be callable"):
+            set_permission_check("not callable")  # type: ignore[arg-type]
+
+    def test_rejects_async_permission_check(self) -> None:
+        """Test that async callbacks cannot accidentally grant access."""
+        async def allow_everyone(request: Request) -> bool:
+            return True
+
+        with pytest.raises(TypeError, match="must be synchronous"):
+            set_permission_check(allow_everyone)  # type: ignore[arg-type]
+
+
 class TestLogiBoardView:
     """Test suite for the LogiBoard endpoint."""
 
@@ -170,6 +212,28 @@ class TestLogiBoardView:
         assert "Access Denied" not in response.text
         assert f"{STATIC_URL_PREFIX}/LogiBoard/css/app.css" in response.text
 
+    def test_application_scoped_predicates_do_not_leak_between_apps(self) -> None:
+        """Test that a custom policy on one app does not affect another."""
+        allowed_app = build_app()
+        denied_app = build_app()
+
+        def allow(request: Request) -> bool:
+            return True
+
+        def deny(request: Request) -> bool:
+            return False
+
+        set_permission_check(allow, app=allowed_app)
+        set_permission_check(deny, app=denied_app)
+
+        with TestClient(allowed_app) as allowed_client:
+            allowed = allowed_client.get("/log-iboard/")
+        with TestClient(denied_app) as denied_client:
+            denied = denied_client.get("/log-iboard/")
+
+        assert allowed.status_code == 200
+        assert denied.status_code == 403
+
     def test_a_custom_predicate_grants_access(self) -> None:
         """Test that an installed predicate decides who may view the page."""
         set_permission_check(lambda request: True)
@@ -178,6 +242,32 @@ class TestLogiBoardView:
             response = client.get("/log-iboard/")
 
         assert response.status_code == 200
+
+    def test_sync_predicate_returning_coroutine_fails_closed(self) -> None:
+        """Test that a dynamically returned coroutine cannot grant access."""
+        async def allow_everyone() -> bool:
+            return True
+
+        def invalid_check(request: Request):
+            return allow_everyone()
+
+        set_permission_check(invalid_check)  # type: ignore[arg-type]
+
+        with TestClient(build_app()) as client:
+            with pytest.raises(TypeError, match="must return bool synchronously"):
+                client.get("/log-iboard/")
+
+        set_permission_check(None)
+
+    def test_non_boolean_permission_result_fails_closed(self) -> None:
+        """Test that truthy values other than bool cannot grant dashboard access."""
+        set_permission_check(lambda request: "yes")  # type: ignore[arg-type]
+
+        with TestClient(build_app()) as client:
+            with pytest.raises(TypeError, match="must return bool synchronously"):
+                client.get("/log-iboard/")
+
+        set_permission_check(None)
 
 
 class TestMountStatic:
@@ -200,3 +290,31 @@ class TestMountStatic:
         paths = [getattr(route, "path", None) for route in app.routes]
         assert "fastapi-logging-kit-static" in names
         assert STATIC_URL_PREFIX in paths
+
+    def test_repeated_mount_is_idempotent(self) -> None:
+        """Test that repeated setup does not register duplicate static mounts."""
+        app = FastAPI()
+        mount_static(app)
+        mount_static(app)
+
+        mounts = [
+            route for route in app.routes
+            if getattr(route, "name", None) == "fastapi-logging-kit-static"
+        ]
+        assert len(mounts) == 1
+
+    def test_existing_path_conflict_fails_explicitly(self) -> None:
+        """Test that an unrelated route cannot be silently shadowed."""
+        app = FastAPI()
+        app.add_route(STATIC_URL_PREFIX, lambda: None, name="application-static")
+
+        with pytest.raises(RuntimeError, match="already registered"):
+            mount_static(app)
+
+    def test_existing_mount_name_at_wrong_path_fails_explicitly(self) -> None:
+        """Test that a misleading mount name cannot suppress static mounting."""
+        app = FastAPI()
+        app.add_route("/other-static/", lambda: None, name="fastapi-logging-kit-static")
+
+        with pytest.raises(RuntimeError, match="unexpected path"):
+            mount_static(app)
