@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterator, List
 
 import pytest
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 
 import fastapi_logging_kit.settings.checks  # noqa: F401  (populates the check registry)
@@ -304,6 +304,45 @@ class TestMiddlewareInstallation:
             MonitorLogSizeMiddleware
         )
 
+    def test_repeated_setup_does_not_duplicate_middleware(
+        self, tmp_path: Path, record_set_config: List[Dict[str, Any]]
+    ) -> None:
+        """Test that calling setup twice keeps one instance of each middleware."""
+        app = FastAPI()
+        config = base_config(tmp_path)
+
+        setup_logging(app, config)
+        setup_logging(app, config)
+
+        installed = [middleware.cls for middleware in app.user_middleware]
+        assert installed.count(RequestLogMiddleware) == 1
+        assert installed.count(MonitorLogSizeMiddleware) == 1
+
+    def test_partial_middleware_installation_fails_explicitly(
+        self, tmp_path: Path, record_set_config: List[Dict[str, Any]]
+    ) -> None:
+        """Test that a partially pre-installed middleware pair is rejected."""
+        app = FastAPI()
+        app.add_middleware(RequestLogMiddleware)
+
+        with pytest.raises(RuntimeError, match="partially installed"):
+            setup_logging(app, base_config(tmp_path))
+
+    def test_started_app_fails_before_legacy_settings_are_mutated(
+        self, tmp_path: Path, record_set_config: List[Dict[str, Any]]
+    ) -> None:
+        """Test that missing middleware is detected before global configuration changes."""
+        app = FastAPI()
+        with TestClient(app) as client:
+            assert client.get("/not-found").status_code == 404
+
+        original_settings = dict(settings_manager.log_settings)
+        with pytest.raises(RuntimeError, match="before the ASGI application starts"):
+            setup_logging(app, base_config(tmp_path))
+
+        assert settings_manager.log_settings == original_settings
+        assert record_set_config == []
+
     def test_middleware_can_be_skipped(
         self, tmp_path: Path, record_set_config: List[Dict[str, Any]]
     ) -> None:
@@ -352,6 +391,144 @@ class TestLogiBoardIntegration:
                 client.get(f"{STATIC_URL_PREFIX}/LogiBoard/css/app.css").status_code
                 == 200
             )
+
+    def test_repeated_setup_does_not_duplicate_log_iboard_routes(
+        self, tmp_path: Path, record_set_config: List[Dict[str, Any]]
+    ) -> None:
+        """Test that the dashboard and static mount are installed once."""
+        app = FastAPI()
+        config = base_config(tmp_path, INCLUDE_LOG_iBOARD=True)
+
+        setup_logging(app, config, add_middleware=False)
+        setup_logging(app, config, add_middleware=False)
+
+        paths = collect_paths(app)
+        assert paths.count("/log-iboard/") == 1
+        assert paths.count(STATIC_URL_PREFIX) == 1
+
+    @pytest.mark.parametrize("prefix", ["", "/admin"])
+    def test_included_router_dashboard_conflicts_are_detected(
+        self, tmp_path: Path, record_set_config: List[Dict[str, Any]], prefix: str
+    ) -> None:
+        app = FastAPI()
+        router = APIRouter()
+        router.add_api_route("/log-iboard/", lambda: None, name="application-dashboard")
+        app.include_router(router, prefix=prefix)
+        config = base_config(tmp_path, INCLUDE_LOG_iBOARD=True)
+
+        if not prefix:
+            with pytest.raises(RuntimeError, match="already registered"):
+                setup_logging(app, config, add_middleware=False)
+            assert record_set_config == []
+        else:
+            setup_logging(app, config, add_middleware=False)
+            with TestClient(app) as client:
+                assert client.get("/log-iboard/").status_code == 403
+                assert client.get("/admin/log-iboard/").status_code == 200
+
+    def test_prefixed_dashboard_name_cannot_suppress_installation(
+        self, tmp_path: Path, record_set_config: List[Dict[str, Any]]
+    ) -> None:
+        app = FastAPI()
+        router = APIRouter()
+        router.add_api_route("/log-iboard/", lambda: None, name="log-iboard")
+        app.include_router(router, prefix="/admin")
+
+        with pytest.raises(RuntimeError, match="unexpected path"):
+            setup_logging(
+                app,
+                base_config(tmp_path, INCLUDE_LOG_iBOARD=True),
+                add_middleware=False,
+            )
+        assert record_set_config == []
+
+    def test_structured_setup_respects_legacy_log_iboard_opt_in(self) -> None:
+        """Test that structured setup still honors the explicit LogiBoard opt-in."""
+        settings_manager.load({"INCLUDE_LOG_iBOARD": True})
+        app = FastAPI()
+
+        setup_logging(app, {"COMPONENTS": {}}, add_middleware=False)
+
+        paths = collect_paths(app)
+        assert "/log-iboard/" in paths
+        assert STATIC_URL_PREFIX in paths
+
+    def test_log_iboard_route_conflict_is_reported(
+        self, tmp_path: Path, record_set_config: List[Dict[str, Any]]
+    ) -> None:
+        """Test that LogiBoard does not silently shadow an application route."""
+        app = FastAPI()
+        app.add_route("/log-iboard/", lambda: None, name="application-dashboard")
+
+        with pytest.raises(RuntimeError, match="already registered"):
+            setup_logging(
+                app,
+                base_config(tmp_path, INCLUDE_LOG_iBOARD=True),
+                add_middleware=False,
+            )
+
+    def test_started_app_cannot_enable_log_iboard_after_startup(
+        self, tmp_path: Path, record_set_config: List[Dict[str, Any]]
+    ) -> None:
+        """Test that a late dashboard opt-in fails before loading legacy settings."""
+        app = FastAPI()
+        with TestClient(app) as client:
+            assert client.get("/not-found").status_code == 404
+
+        original_settings = dict(settings_manager.log_settings)
+        with pytest.raises(RuntimeError, match="LogiBoard must be enabled before"):
+            setup_logging(
+                app,
+                base_config(tmp_path, INCLUDE_LOG_iBOARD=True),
+                add_middleware=False,
+            )
+
+        assert settings_manager.log_settings == original_settings
+        assert record_set_config == []
+
+    def test_dashboard_named_route_at_wrong_path_fails(
+        self, tmp_path: Path, record_set_config: List[Dict[str, Any]]
+    ) -> None:
+        """Test that a route name alone cannot suppress the LogiBoard router."""
+        app = FastAPI()
+        app.add_route("/another-dashboard/", lambda: None, name="log-iboard")
+
+        with pytest.raises(RuntimeError, match="unexpected path"):
+            setup_logging(
+                app,
+                base_config(tmp_path, INCLUDE_LOG_iBOARD=True),
+                add_middleware=False,
+            )
+
+    def test_log_iboard_static_mount_name_at_wrong_path_fails(
+        self, tmp_path: Path, record_set_config: List[Dict[str, Any]]
+    ) -> None:
+        """Test that an unrelated mount name cannot suppress LogiBoard assets."""
+        app = FastAPI()
+        app.add_route("/another-static/", lambda: None, name="fastapi-logging-kit-static")
+
+        with pytest.raises(RuntimeError, match="unexpected path"):
+            setup_logging(
+                app,
+                base_config(tmp_path, INCLUDE_LOG_iBOARD=True),
+                add_middleware=False,
+            )
+
+    def test_log_iboard_static_path_conflict_is_reported(
+        self, tmp_path: Path, record_set_config: List[Dict[str, Any]]
+    ) -> None:
+        """Test that LogiBoard cannot replace an application static mount."""
+        app = FastAPI()
+        app.add_route(STATIC_URL_PREFIX, lambda: None, name="application-static")
+
+        with pytest.raises(RuntimeError, match="already registered"):
+            setup_logging(
+                app,
+                base_config(tmp_path, INCLUDE_LOG_iBOARD=True),
+                add_middleware=False,
+            )
+
+        assert not app.user_middleware
 
     def test_excludes_the_router_when_disabled(
         self, tmp_path: Path, record_set_config: List[Dict[str, Any]]

@@ -21,7 +21,7 @@ import logging
 import logging.config
 from copy import deepcopy
 from threading import RLock
-from typing import Any, List, Mapping, Optional
+from typing import Any, Iterator, List, Mapping, Optional
 
 from fastapi_logging_kit.checks import Error, run_checks
 from fastapi_logging_kit.constants.ansi_colors import AnsiColors
@@ -77,6 +77,8 @@ def _setup_structured(app: Optional[Any], config: Mapping[str, Any], *, add_midd
     compiled = compile_settings(config)
     if not compiled["ENABLED"]:
         return
+    if app is not None and include_log_iboard():
+        _validate_log_iboard(app)
     with _STRUCTURED_LOCK:
         if app is not None:
             previous = getattr(app.state, "_fastapi_logging_kit_structured", None)
@@ -118,7 +120,98 @@ def _setup_structured(app: Optional[Any], config: Mapping[str, Any], *, add_midd
             if add_middleware and compiled["REQUEST_LOGGING"]["ENABLED"]:
                 from fastapi_logging_kit.middleware import RequestLogMiddleware
                 app.add_middleware(RequestLogMiddleware, config=deepcopy(compiled["REQUEST_LOGGING"]))
+            if include_log_iboard():
+                _install_log_iboard(app)
             app.state._fastapi_logging_kit_structured = compiled
+
+
+def _iter_app_routes(
+    app: Any, prefix: str = ""
+) -> Iterator[tuple[Optional[str], Optional[str]]]:
+    """Yield route names and effective paths through included routers."""
+    for route in getattr(app, "routes", ()):
+        path = getattr(route, "path", None)
+        yield getattr(route, "name", None), prefix + path if path is not None else None
+        included = getattr(route, "original_router", None)
+        if included is not None:
+            context = getattr(route, "include_context", None)
+            yield from _iter_app_routes(included, prefix + getattr(context, "prefix", ""))
+
+
+def _validate_log_iboard(app: Any) -> None:
+    """Detect route conflicts before changing logging or middleware state."""
+    from fastapi_logging_kit.templating import STATIC_URL_PREFIX
+
+    for route_name, route_path in _iter_app_routes(app):
+        if route_name == "log-iboard" and route_path != "/log-iboard/":
+            raise RuntimeError(
+                "The route named 'log-iboard' is registered at an "
+                f"unexpected path: {route_path!r}."
+            )
+        if route_name != "log-iboard" and route_path == "/log-iboard/":
+            raise RuntimeError(
+                "Cannot install LogiBoard: '/log-iboard/' is already registered."
+            )
+        if route_name == "fastapi-logging-kit-static" and route_path != STATIC_URL_PREFIX:
+            raise RuntimeError(
+                "The route named 'fastapi-logging-kit-static' is registered at an "
+                f"unexpected path: {route_path!r}."
+            )
+        if route_name != "fastapi-logging-kit-static" and route_path == STATIC_URL_PREFIX:
+            raise RuntimeError(
+                f"Cannot mount LogiBoard assets: {STATIC_URL_PREFIX!r} "
+                "is already registered by another route."
+            )
+
+
+def _validate_legacy_app_setup(
+    app: Any, *, add_middleware: bool, include_dashboard: bool
+) -> None:
+    """Preflight legacy ASGI changes before mutating process-wide settings."""
+    installed = {middleware.cls for middleware in app.user_middleware}
+    expected = set()
+    if add_middleware:
+        from fastapi_logging_kit.middleware import (
+            MonitorLogSizeMiddleware,
+            RequestLogMiddleware,
+        )
+
+        expected = {MonitorLogSizeMiddleware, RequestLogMiddleware}
+        present = installed & expected
+        if present and present != expected:
+            raise RuntimeError(
+                "FastAPI Logging Kit middleware is partially installed; configure it "
+                "once before serving requests."
+            )
+        if app.middleware_stack is not None and present != expected:
+            raise RuntimeError(
+                "FastAPI Logging Kit middleware must be configured before the ASGI "
+                "application starts serving requests."
+            )
+
+    if include_dashboard:
+        _validate_log_iboard(app)
+        if app.middleware_stack is not None:
+            route_names = {name for name, _ in _iter_app_routes(app)}
+            if not {"log-iboard", "fastapi-logging-kit-static"}.issubset(route_names):
+                raise RuntimeError(
+                    "LogiBoard must be enabled before the ASGI application "
+                    "starts serving requests."
+                )
+
+
+def _install_log_iboard(app: Any) -> None:
+    """Install the LogiBoard route and static mount without duplicates."""
+    from fastapi_logging_kit.routers import log_iboard as log_iboard_router
+    from fastapi_logging_kit.routers import router
+
+    _validate_log_iboard(app)
+    has_dashboard = any(
+        name == "log-iboard" for name, _ in _iter_app_routes(app)
+    )
+    if not has_dashboard:
+        app.include_router(router)
+    log_iboard_router.mount_static(app)
 
 
 def setup_logging(
@@ -139,10 +232,11 @@ def setup_logging(
         app (Optional[Any]): The FastAPI application to wire into. When
             omitted, only the logging configuration is applied.
         config (Optional[Mapping[str, Any]]): The configuration mapping.
-            When omitted, the existing configuration (from environment
-            variables and defaults) is kept.
-        add_middleware (bool): Whether to install RequestLogMiddleware
-            and MonitorLogSizeMiddleware on *app*.
+            When omitted, the structured defaults are used unless legacy
+            flat-key settings have already been loaded.
+        add_middleware (bool): Whether to install request middleware.
+            The legacy flat-key path also installs MonitorLogSizeMiddleware;
+            the structured contract installs RequestLogMiddleware only.
         run_configuration_checks (bool): Whether to validate the
             configuration and warn about any problems.
 
@@ -157,6 +251,18 @@ def setup_logging(
     ):
         _setup_structured(app, config, add_middleware=add_middleware)
         return
+
+    if app is not None:
+        from fastapi_logging_kit.settings.manager import SettingsManager
+
+        intended_settings = (
+            SettingsManager(config) if config is not None else settings_manager
+        )
+        _validate_legacy_app_setup(
+            app,
+            add_middleware=add_middleware,
+            include_dashboard=intended_settings.include_log_iboard,
+        )
 
     if config is not None:
         settings_manager.load(config)
@@ -183,14 +289,13 @@ def setup_logging(
             RequestLogMiddleware,
         )
 
-        # Added in reverse order: add_middleware prepends, so the request
-        # logger ends up outermost and times the full request.
-        app.add_middleware(MonitorLogSizeMiddleware)
-        app.add_middleware(RequestLogMiddleware)
+        installed = {middleware.cls for middleware in app.user_middleware}
+        expected = {MonitorLogSizeMiddleware, RequestLogMiddleware}
+        if not expected.issubset(installed):
+            # Added in reverse order: add_middleware prepends, so the request
+            # logger ends up outermost and times the full request.
+            app.add_middleware(MonitorLogSizeMiddleware)
+            app.add_middleware(RequestLogMiddleware)
 
     if include_log_iboard():
-        from fastapi_logging_kit.routers import log_iboard as log_iboard_router
-        from fastapi_logging_kit.routers import router
-
-        app.include_router(router)
-        log_iboard_router.mount_static(app)
+        _install_log_iboard(app)
