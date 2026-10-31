@@ -8,6 +8,7 @@ importing the middleware.
 
 """
 
+import ipaddress
 from typing import Any, Optional
 
 UNKNOWN_IP = "Unknown IP"
@@ -15,38 +16,21 @@ UNKNOWN_USER_AGENT = "Unknown User Agent"
 
 
 def get_ip_address(request: Any) -> str:
-    """Retrieve the client's IP address from the request.
+    """Return the immediate ASGI peer address without trusting proxy headers.
 
-    The ``X-Forwarded-For`` header wins when present, using its first
-    entry; otherwise the address of the immediate peer is used.
-
-    Args:
-        request (Any): The incoming request.
-
-    Returns:
-        str: The client's IP address, or ``"Unknown IP"``.
-
+    Forwarded addresses are security-sensitive and must be resolved by the
+    middleware using an explicit trusted-proxy policy. This helper is also used
+    by email notifications, where no proxy policy is available, so it always
+    falls back to the transport peer.
     """
-    # Return the cached IP address if it exists
-    cached = getattr(request, "ip_address", None)
-    if cached:
-        return str(cached)
-
-    forwarded_for = request.headers.get("x-forwarded-for")
-
-    if forwarded_for:
-        # Split on commas and strip whitespace from each part
-        ip_address_list = [ip.strip() for ip in forwarded_for.split(",") if ip.strip()]
-        # Use the first valid IP in the list
-        if ip_address_list:
-            return ip_address_list[0]
-
-    # Fallback to the peer address if no valid X-Forwarded-For header
     client = getattr(request, "client", None)
-    if client is not None and getattr(client, "host", None):
-        return str(client.host)
-
-    return UNKNOWN_IP
+    host = getattr(client, "host", None) if client is not None else None
+    if not isinstance(host, str) or not host:
+        return UNKNOWN_IP
+    try:
+        return str(ipaddress.ip_address(host))
+    except ValueError:
+        return UNKNOWN_IP
 
 
 def get_user_agent(request: Any) -> str:

@@ -111,7 +111,8 @@ class TestEmailHandlerRenderTemplate:
     ) -> None:
         """Test that a request contributes its IP address and user agent."""
         request = request_factory(
-            headers={"user-agent": "TestBrowser/1.0", "x-forwarded-for": "10.0.0.7"}
+            headers={"user-agent": "TestBrowser/1.0"},
+            client=("10.0.0.7", 8000),
         )
 
         body = EmailHandler.render_template("a log entry", request)

@@ -51,24 +51,25 @@ class _NamelessUser:
 class TestGetIpAddress:
     """Test suite for the `get_ip_address` helper."""
 
-    def test_returns_cached_ip_address(
+    def test_ignores_unverified_cached_ip_address(
         self, request_factory: Callable[..., Request]
     ) -> None:
-        """Test that a pre-computed `ip_address` attribute wins."""
-        request = request_factory()
-        request.ip_address = "10.0.0.9"
+        """A request attribute is not a trusted source of peer identity."""
+        request = request_factory(client=("192.0.2.10", 8000))
+        request.ip_address = "203.0.113.99"
 
-        assert get_ip_address(request) == "10.0.0.9"
+        assert get_ip_address(request) == "192.0.2.10"
 
-    def test_uses_first_forwarded_for_entry(
+    def test_ignores_untrusted_forwarded_for_header(
         self, request_factory: Callable[..., Request]
     ) -> None:
-        """Test that the first `X-Forwarded-For` entry is used."""
+        """Client-supplied forwarding headers must not override the peer."""
         request = request_factory(
-            headers={"X-Forwarded-For": "  203.0.113.1 , 70.41.3.18 , 150.172.238.178 "}
+            headers={"X-Forwarded-For": "203.0.113.1, 70.41.3.18"},
+            client=("192.0.2.10", 8000),
         )
 
-        assert get_ip_address(request) == "203.0.113.1"
+        assert get_ip_address(request) == "192.0.2.10"
 
     def test_empty_forwarded_for_falls_back_to_client(
         self, request_factory: Callable[..., Request]
@@ -107,6 +108,14 @@ class TestGetIpAddress:
     ) -> None:
         """Test that a blank peer host yields the unknown marker."""
         request = request_factory(client=("", 0))
+
+        assert get_ip_address(request) == UNKNOWN_IP
+
+    def test_returns_unknown_for_non_ip_client_host(
+        self, request_factory: Callable[..., Request]
+    ) -> None:
+        """Invalid client host strings are not treated as IP addresses."""
+        request = request_factory(client=("not-an-ip", 8000))
 
         assert get_ip_address(request) == UNKNOWN_IP
 
