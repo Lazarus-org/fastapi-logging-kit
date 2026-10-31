@@ -95,7 +95,7 @@ Security issues are caught with ``bandit``:
 
 .. code-block:: bash
 
-    poetry run bandit -r fastapi_logging_kit
+    poetry run bandit -c pyproject.toml -r fastapi_logging_kit
 
 Both ``bandit`` and the pre-commit hooks are also available as dedicated ``tox`` environments:
 

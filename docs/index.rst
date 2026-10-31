@@ -1,4 +1,4 @@
-Welcome to fastapi_logging_kit Documentation!
+FastAPI Logging Kit Documentation
 ======================================
 
 .. |br| raw:: html
@@ -9,21 +9,9 @@ Welcome to fastapi_logging_kit Documentation!
     :target: https://github.com/lazarus-org/fastapi-logging-kit/blob/main/LICENCE
     :alt: License
 
-.. image:: https://img.shields.io/pypi/v/fastapi-logging-kit
-    :target: https://pypi.org/project/fastapi-logging-kit/
-    :alt: PyPI release
-
 .. image:: https://img.shields.io/readthedocs/fastapi-logging-kit
     :target: https://fastapi-logging-kit.readthedocs.io/en/latest/
     :alt: Documentation
-
-.. image:: https://img.shields.io/badge/pylint-10/10-brightgreen?logo=python&logoColor=blue
-   :target: https://www.pylint.org/
-   :alt: Pylint
-
-.. image:: https://img.shields.io/pypi/pyversions/fastapi-logging-kit
-    :target: https://pypi.org/project/fastapi-logging-kit/
-    :alt: Supported Python versions
 
 .. image:: https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=yellow
    :target: https://github.com/pre-commit/pre-commit
@@ -51,7 +39,7 @@ Welcome to fastapi_logging_kit Documentation!
 
 One of the key advantages of ``fastapi_logging_kit`` is its seamless integration. Get started with fastapi_logging_kit in your existing projects without refactoring any code. Even if you're already using the **built-in logging module**, you can instantly upgrade to advanced features with just a simple installation. No extra changes or complicated setup required!
 
-imagine you have a FastAPI service that was developed a few years ago and already uses Python's built-in ``logging``. Refactoring the entire codebase to use another logging package would be a daunting task. But with ``fastapi_logging_kit``, you don't have to worry about that. Simply install fastapi_logging_kit, call ``setup_logging(app)`` once, and enjoy all its advanced features with logging each ``LEVEL`` in separate files with three extra formats (``json``, ``xml``, ``flat``) **without having to make any changes** to your existing code.
+Imagine you have a FastAPI service that already uses Python's built-in ``logging``. Refactoring the entire codebase to use another logging package would be a daunting task. With ``fastapi_logging_kit``, you can integrate request logging and console output by calling ``setup_logging(app)``. Configure file handlers and the JSON, XML, or FLAT formats explicitly when you need them; the default setup does not silently replace your existing root handlers.
 
 ``fastapi_logging_kit`` is a port of `django_logging <https://github.com/lazarus-org/django_logging>`_. If you are coming from that package, see :ref:`migrating_from_django_logging` for the mapping between the two.
 
@@ -63,8 +51,8 @@ Supported Versions
 ==========  ==========================================
   FastAPI     Python
 ==========  ==========================================
-0.100+      3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-0.115+      3.10, 3.11, 3.12, 3.13, 3.14
+0.100+      3.11, 3.12, 3.13, 3.14
+0.115+      3.11, 3.12, 3.13, 3.14, 3.15
 ==========  ==========================================
 
 Documentation

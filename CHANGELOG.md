@@ -1,0 +1,45 @@
+# Changelog
+
+All notable changes to FastAPI Logging Kit are documented here.
+
+## Unreleased
+
+### Added
+
+- Add Python 3.15 to the compatibility matrix and package classifiers.
+- Add regression coverage for LogiBoard installation conflicts, repeated setup, and application-scoped permission policies.
+- Add browser-side security regressions for archive filenames and ZIP folder-tree construction.
+- Add permission-callback regression coverage for asynchronous and non-boolean fail-open cases.
+- Add a PEP 561 typing marker and distribution-content verification.
+- Add CI jobs for wheel/source-distribution builds, installed-package smoke tests, type checking, and linting.
+
+### Changed
+
+- Explicitly include LogiBoard static assets, HTML templates, and the PEP 561 marker in wheels and source distributions.
+- Use the PyPI SQLAlchemy extra consistently in the Sphinx usage guide.
+- Verify every package source/resource file and the installed console entry point in built distributions.
+- Rename the distribution to `fastapi-logging-kit` and the import namespace to `fastapi_logging_kit`.
+- Rename the CLI command, environment-variable prefix, LogiBoard static URL, and project documentation links to match the new package identity.
+- Raise the minimum supported Python version to 3.11 and cap the declared range at Python 3.15 until the next compatibility cycle.
+- Drop Python 3.9 and 3.10 from the supported runtime and CI matrices.
+- Declare runtime and optional dependencies through PEP 621 metadata and use SPDX license metadata.
+- Keep tests, documentation, and development support files in the source distribution while excluding tests from the wheel.
+- Use Python 3.15 with the current FastAPI compatibility line in CI.
+- Pin the legacy FastAPI compatibility lane to an httpx version compatible with its Starlette TestClient.
+- Update test and documentation tooling to versions that support the new Python matrix.
+
+### Fixed
+
+- Restrict log archiving to recognized rotated log filenames; unrelated files are no longer moved.
+- Preserve nested log-directory paths when archiving rotated files.
+- Exclude symlinked files and directories from archive discovery.
+- Publish gzip archives atomically and preserve the source when compression fails.
+- Avoid leaving the temporary archive base file behind when the `send-logs` command completes.
+- Make LogiBoard route and static-asset installation idempotent.
+- Detect LogiBoard route conflicts before changing application logging or middleware state.
+- Reject asynchronous and non-boolean LogiBoard permission results instead of treating truthy coroutine objects or values as authorization.
+- Reject middleware and LogiBoard registration attempts that occur after the ASGI app has started, before mutating legacy settings.
+- Render uploaded ZIP filenames as text instead of HTML, preventing archive-name script injection in LogiBoard.
+- Build archive folder trees with null-prototype objects to avoid prototype-key collisions.
+- Pin the LogiBoard ZIP parser with Subresource Integrity.
+- Align the README's LogiBoard permission example with the application-scoped API and document the authentication middleware requirement.

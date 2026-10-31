@@ -178,7 +178,7 @@ Example Usage:
 Tracking queries
 ^^^^^^^^^^^^^^^^
 
-Django counted queries automatically through ``connection.queries``. FastAPI ships no ORM, so ``fastapi_logging_kit`` keeps its own per-context query log. If you use SQLAlchemy, instrument your engine once at startup:
+Django counted queries automatically through ``connection.queries``. FastAPI ships no ORM, so ``fastapi_logging_kit`` keeps its own per-context query log. SQLAlchemy integration is optional; install it with ``pip install "fastapi-logging-kit[sqlalchemy]"`` before instrumenting your engine once at startup:
 
 .. code-block:: python
 
@@ -300,7 +300,7 @@ Because the request context is bound to context variables, your own log calls in
 MonitorLogSizeMiddleware
 ------------------------
 
-``MonitorLogSizeMiddleware`` runs the log size audit at most once a week, warning the admin by email when the log directory exceeds ``LOG_DIR_SIZE_LIMIT``. It is installed by ``setup_logging`` alongside the request middleware.
+``MonitorLogSizeMiddleware`` runs the log size audit at most once a week, warning the admin by email when the log directory exceeds ``LOG_DIR_SIZE_LIMIT``. It is installed by ``setup_logging`` when the legacy flat-key configuration path is used. The structured ``FASTAPI_LOGGING`` contract installs ``RequestLogMiddleware`` only and does not enable the legacy file-size audit.
 
 The "last run" timestamp is kept in a small in-process cache. If you run several workers and want them to share it, install your own backend:
 

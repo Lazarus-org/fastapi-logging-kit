@@ -1,9 +1,9 @@
 Settings
 ========
 
-By default, `fastapi_logging_kit` uses a built-in configuration that requires no additional setup. However, you can customize the logging settings by passing a configuration mapping to ``setup_logging``, or by setting ``FASTAPI_LOGGING_``-prefixed environment variables.
+For new applications, ``setup_logging(app)`` uses the structured defaults and requires no additional settings module. It preserves existing root handlers, installs request logging, and does not create per-level files or enable the legacy weekly log-size audit.
 
-An explicit mapping passed to ``setup_logging`` takes priority over the environment, which in turn takes priority over the packaged defaults.
+The legacy flat-key configuration remains available for migration. When that path is selected by passing flat keys to ``setup_logging`` or by loading legacy settings, values can be supplied through ``FASTAPI_LOGGING_``-prefixed environment variables. An explicit legacy mapping takes priority over the environment, which in turn takes priority over the packaged legacy defaults.
 
 .. code-block:: python
 
@@ -26,6 +26,69 @@ Environment variables are parsed as JSON, falling back to a plain string:
 .. note::
 
    Configuration check failures are logged as warnings — they do **not** abort startup the way Django system checks do. Your application still boots.
+
+Structured logging formatters
+-----------------------------
+
+With the new ``FASTAPI_LOGGING`` contract, supply standard ``dictConfig``
+settings under ``LOGGING``. A formatter may use
+``fastapi_logging_kit.formatters.JSONFormatter``, ``XMLFormatter``, or
+``FLATFormatter`` and accept a ``structured_logging`` dictionary as
+constructor kwargs. These settings do not depend on a separate settings
+package.
+
+.. note::
+
+   Request middleware settings are copied into each FastAPI application, but
+   Python's logging registry and handler graph are process-wide. Separate
+   FastAPI applications in one process do not receive isolated logging registries.
+
+.. code-block:: python
+
+    setup_logging(app, config={
+        "LOGGING": {
+            "version": 1,
+            "formatters": {
+                "json": {
+                    "()": "fastapi_logging_kit.formatters.JSONFormatter",
+                    "fmt": "%(levelname)s %(message)s %(context)s",
+                    "structured_logging": {
+                        "JSON_COMPACT": True,
+                        "MAX_DEPTH": 8,
+                        "MAX_ITEMS": 100,
+                        "MAX_STRING_LENGTH": 4096,
+                        "MAX_EVENT_BYTES": 65536,
+                        "MAX_EXCEPTION_FRAMES": 32,
+                        "EXCEPTION_MODE": "type",
+                        "INCLUDE_EXTRA": True,
+                        "REDACT_FIELDS": ["private_reference"],
+                    },
+                },
+            },
+            "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "json"}},
+            "root": {"level": "INFO", "handlers": ["console"]},
+        },
+    })
+
+``MAX_DEPTH`` and ``MAX_ITEMS`` limit traversal of nested data;
+``MAX_STRING_LENGTH`` and ``MAX_EVENT_BYTES`` constrain individual values
+and completed events. ``EXCEPTION_MODE`` accepts ``omit``, ``type`` or
+``traceback``. The default is bounded traceback formatting, which can
+include sensitive exception text. Use ``type`` or ``omit`` for stricter data
+protection.
+
+Named fields are redacted recursively, including nested dictionaries and
+``extra`` values. **Unstructured log messages cannot be reliably redacted**;
+do not put credentials or personal data in arbitrary free-text log strings.
+JSON output is compact single-line by default. XML output filters invalid XML
+characters. FLAT output escapes control characters and quotes.
+
+For new applications ``setup_logging(app)`` is additive and does not replace
+existing root handlers. Supplying an explicit ``LOGGING`` mapping invokes
+standard process-wide ``logging.config.dictConfig`` semantics.
+
+Legacy flat-key settings
+------------------------
 
 Default configuration
 ---------------------
@@ -218,6 +281,12 @@ Here's a breakdown of the available configuration options:
       - **Type**: ``bool``
       - **Description**: Whether the email body is rendered with the packaged HTML template. Defaults to ``True``.
 
+Background delivery uses a bounded per-process worker count (``MAX_CONCURRENT``,
+1–64, default 4) and an SMTP timeout (``SMTP_TIMEOUT``, 1–120 seconds,
+default 10). When all slots are occupied, new notifications are discarded
+rather than building up threads or an unbounded queue. This is best-effort,
+not a durable delivery system.
+
 ``EMAIL``
 ---------
 
@@ -404,3 +473,39 @@ Keep credentials out of your source tree by supplying them through the environme
 .. code-block:: shell
 
    export FASTAPI_LOGGING_EMAIL='{"EMAIL_HOST":"smtp.example.com","EMAIL_PORT":587,"ADMIN_EMAIL":"admin@example.com"}'
+
+Explicit application configuration
+----------------------------------
+
+The :func:`fastapi_logging_kit.setup_logging` integration also accepts a structured
+``FASTAPI_LOGGING`` dictionary with four top-level entries:
+
+* ``ENABLED``: boolean master switch (default ``True``).
+* ``LOGGING``: optional Python ``logging.config.dictConfig`` dictionary.
+* ``COMPONENTS``: non-destructive component additions, replacements, disabling,
+  and explicit root/package handler assignments.
+* ``REQUEST_LOGGING``: ASGI request logging and security policy.
+
+Developers may store the dictionary in any Python module or settings system;
+``fastapi_logging_kit`` does not discover or import application settings modules.
+When ``LOGGING`` is omitted, package-owned handler activation preserves existing
+root handlers. When ``LOGGING`` is supplied, standard dictConfig semantics apply.
+
+Request logging defaults to one completion event; starting events are optional.
+Request IDs are returned in the configured response header and validated
+against the configurable ``MAX_REQUEST_ID_LENGTH`` limit (default 80, maximum
+256). Paths can be excluded exactly or by prefix. Query diagnostics require
+explicit opt-in and are bounded and redacted. JSON request-body diagnostics
+and JSON error-response
+body diagnostics are opt-in through ``REQUEST_BODY_ENABLED`` and
+``ERROR_RESPONSE_BODY_ENABLED``. Request-body capture applies to POST, PUT,
+and PATCH requests. Capture is bounded to at most 64 KiB, is
+restricted to JSON media types, recursively redacts sensitive fields, and does
+not change ASGI messages delivered to the application. Error response bodies
+are captured only for status codes 400 and above. Unsupported content types,
+invalid JSON, oversized bodies, and incomplete request bodies are never logged
+as raw text; they are skipped or represented by safe markers. Treat body
+logging as sensitive diagnostic functionality and leave it disabled unless
+there is a clear operational need.
+
+For complete examples see the README's explicit configuration section.

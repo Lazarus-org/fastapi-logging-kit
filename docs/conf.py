@@ -6,21 +6,25 @@
 
 # -- Path setup --------------------------------------------------------------
 
-import os
 import sys
+import tomllib
+from pathlib import Path
 
-sys.path.insert(0, os.path.abspath(".."))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+PROJECT_METADATA = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
 
 # -- Project information -----------------------------------------------------
 
-project = "fastapi_logging_kit"
+project = "FastAPI Logging Kit"
+html_title = "FastAPI Logging Kit Documentation"
 copyright = "2026, Lazarus"
 author = "ARYAN-NIKNEZHAD, MEHRSHAD-MIRSHEKARY"
 
 # The full version, including alpha/beta/rc tags
-release = "1.0.0"
+release = PROJECT_METADATA["version"]
 
-master_doc = "index"
+root_doc = "index"
 
 # -- General configuration ---------------------------------------------------
 

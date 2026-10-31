@@ -1,31 +1,37 @@
 # FastAPI Logging Kit
 
-Welcome to fastapi_logging_kit Documentation!
+Structured, extensible logging for FastAPI and ASGI applications.
+
+![PyPI - Version](https://img.shields.io/pypi/v/fastapi-logging-kit)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/fastapi-logging-kit)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/fastapi-logging-kit)
 
 ![License](https://img.shields.io/github/license/lazarus-org/fastapi-logging-kit)
-![PyPI release](https://img.shields.io/pypi/v/fastapi-logging-kit)
 ![Documentation](https://img.shields.io/readthedocs/fastapi-logging-kit)
 ![CI Workflow](https://github.com/lazarus-org/fastapi-logging-kit/actions/workflows/ci.yml/badge.svg)
-![Supported Python versions](https://img.shields.io/pypi/pyversions/fastapi-logging-kit)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=yellow)](https://github.com/pre-commit/pre-commit)
 ![Last Commit](https://img.shields.io/github/last-commit/lazarus-org/fastapi-logging-kit)
 ![Languages](https://img.shields.io/github/languages/top/lazarus-org/fastapi-logging-kit)
 ![Open Issues](https://img.shields.io/github/issues/lazarus-org/fastapi-logging-kit)
 [![codecov](https://codecov.io/gh/lazarus-org/fastapi-logging-kit/branch/main/graph/badge.svg)](https://codecov.io/gh/lazarus-org/fastapi-logging-kit)
-[![pylint](https://img.shields.io/badge/pylint-10/10-brightgreen?logo=python&logoColor=blue)](https://www.pylint.org/)
 
-The [`fastapi_logging_kit`](https://github.com/lazarus-org/fastapi-logging-kit) is a powerful yet simple FastAPI package that extends and enhances Python's built-in ``logging`` without relying on any **third-party** logging libraries. Our goal is to keep things straightforward while providing flexible and customizable logging solutions that are specifically designed for FastAPI applications.
+`fastapi-logging-kit` integrates with Python's standard `logging` package and FastAPI.
+A single `setup_logging(app)` call enables safe request-completion logging and a
+console logger without altering existing root handlers. Applications can supply
+an explicit `FASTAPI_LOGGING` mapping to configure standard `dictConfig`
+components, ASGI request logging, and extensible handlers, filters, and
+formatters. No Django or settings-package dependency is required.
 
-One of the key advantages of ``fastapi_logging_kit`` is its seamless integration. Get started with fastapi_logging_kit in your existing projects without refactoring any code. Even if you're already using the **built-in logging module**, you can instantly upgrade to advanced features with just a simple installation. No extra changes or complicated setup required!
+The JSON, XML, and FLAT structured formatters preserve original messages,
+redact named sensitive fields, and impose limits on serialization depth,
+items, output bytes, string lengths, and exception traces.
 
-imagine you have a FastAPI service that was developed a few years ago and already uses Python's built-in ``logging``. Refactoring the entire codebase to use another logging package would be a daunting task. But with ``fastapi_logging_kit``, you don't have to worry about that. Simply install fastapi_logging_kit, call ``setup_logging(app)`` once, and enjoy all its advanced features with logging each ``LEVEL`` in separate files with three extra formats (``json``, ``xml``, ``flat``) **without having to make any changes** to your existing code.
-
-`fastapi_logging_kit` is a port of [`django_logging`](https://github.com/lazarus-org/django_logging). If you are coming from that package, see [Migrating from django_logging](#migrating-from-django_logging) for the mapping between the two.
+For migration from `django_logging`, see [Migrating from django_logging](#migrating-from-django_logging).
 
 
 ## Project Detail
 
-- Language: Python >= 3.9
+- Language: Python >= 3.11 (supported: 3.11–3.15)
 - Framework: FastAPI >= 0.100
 
 
@@ -79,29 +85,67 @@ Start your server to verify the installation:
 uvicorn main:app --reload
 ```
 
-when the server starts, you'll see an initialization message like this in your *console*:
+The default structured integration preserves the host application's existing
+root handlers and installs request logging. It does **not** automatically
+create per-level log files. Configure file handlers explicitly through
+`LOGGING` or `COMPONENTS` if you need them.
 
-```shell
-INFO | 'datetime' | fastapi_logging_kit | Logging initialized with the following configurations:
-Log File levels: ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'].
-Log files are being written to: logs.
-Console output level: DEBUG.
-Colorize console: True.
-Log date format: %Y-%m-%d %H:%M:%S.
-Email notifier enabled: False.
-Log rotation type: none.
+### Structured JSON logging
+
+To emit JSON logs using standard Python logging configuration:
+
+```python
+from fastapi import FastAPI
+from fastapi_logging_kit import setup_logging
+
+app = FastAPI()
+setup_logging(app, config={
+    "LOGGING": {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "json": {
+                "()": "fastapi_logging_kit.formatters.JSONFormatter",
+                "fmt": "%(levelname)s %(message)s %(context)s",
+                "structured_logging": {
+                    "INCLUDE_EXTRA": True,
+                    "REDACT_FIELDS": ["customer_reference"],
+                    "MAX_EVENT_BYTES": 65536,
+                    "EXCEPTION_MODE": "type",
+                },
+            },
+        },
+        "handlers": {
+            "stdout": {
+                "class": "logging.StreamHandler",
+                "formatter": "json",
+            },
+        },
+        "root": {"level": "INFO", "handlers": ["stdout"]},
+    },
+    "REQUEST_LOGGING": {
+        "QUERY_PARAMS_ENABLED": False,
+        "REQUEST_BODY_ENABLED": False,
+        "ERROR_RESPONSE_BODY_ENABLED": False,
+        "LOG_STREAMING_EVENTS": False,
+        "LOG_SQL_QUERIES": False,
+        "MAX_SQL_BYTES": 4096,
+        "MAX_SQL_QUERIES": 100,
+        "MAX_REQUEST_ID_LENGTH": 80,
+    },
+})
 ```
 
-By default, fastapi_logging_kit will log each level to its own file:
-- DEBUG : `logs/debug.log`
-- INFO : `logs/info.log`
-- WARNING : `logs/warning.log`
-- ERROR : `logs/error.log`
-- CRITICAL : `logs/critical.log`
+By supplying `LOGGING`, you explicitly select Python's process-wide
+`dictConfig` replacement semantics. This is different from the no-config
+additive setup. To preserve existing handlers, leave `LOGGING` empty and use
+`COMPONENTS` for additive extensions.
 
-In addition, logs will be displayed in ***colorized*** mode in the `console`, making it easier to distinguish between different log levels.
-
-That's it! `fastapi_logging_kit` is ready to use. For further customization, refer to the [Settings](#settings) section.
+Structured formatters never parse free-form `key=value` strings into fields.
+Pass structured values through `extra={...}` or the request-context filter
+instead. Redaction applies to named structured fields, **not** arbitrary
+secrets embedded in messages or exception text. The `exception` policy can be
+set to `"omit"`, `"type"`, or `"traceback"`.
 
 
 ## Usage
@@ -126,9 +170,11 @@ logger.critical("This is a critical message")
 
 These logs will be handled according to the configurations set up by `fastapi_logging_kit`, using either the default settings or any custom settings you've provided.
 
-### Configuring
+### Legacy configuration
 
-`setup_logging` accepts the configuration as its second argument:
+Existing flat-key configuration remains supported for migration. New applications should use the structured `FASTAPI_LOGGING` contract above.
+
+`setup_logging` accepts the legacy configuration as its second argument:
 
 ```python
 from fastapi import FastAPI
@@ -250,7 +296,13 @@ def some_function():
 
 **Tracking queries**
 
-Django counted queries automatically through `connection.queries`. FastAPI ships no ORM, so `fastapi_logging_kit` keeps its own per-context query log. If you use SQLAlchemy, instrument your engine once at startup:
+Django counted queries automatically through `connection.queries`. FastAPI ships no ORM, so `fastapi_logging_kit` keeps a bounded, context-local query log. SQLAlchemy support is optional; install it with:
+
+```shell
+pip install "fastapi-logging-kit[sqlalchemy]"
+```
+
+Then instrument your engine once at startup:
 
 ```python
 from sqlalchemy import create_engine
@@ -260,6 +312,26 @@ from fastapi_logging_kit import instrument_sqlalchemy
 engine = create_engine("postgresql://...")
 instrument_sqlalchemy(engine)
 ```
+
+Enable request-level SQL diagnostics explicitly in the structured configuration:
+
+```python
+FASTAPI_LOGGING = {
+    "REQUEST_LOGGING": {
+        "LOG_SQL_QUERIES": True,
+        "MAX_SQL_BYTES": 4096,
+        "MAX_SQL_QUERIES": 100,
+    },
+}
+```
+
+`MAX_SQL_BYTES` bounds the retained SQL text and final diagnostic message.
+`MAX_SQL_QUERIES` caps the number of statements captured per request. The
+public `record_query()` API also applies a bounded default history when it is
+used outside a request scope. `query_capture()` provides an explicit isolated
+scope for custom instrumentation. Captured SQL is not automatically redacted:
+parameterized statements are strongly preferred, and enabling SQL diagnostics
+should be treated as a deliberate data-exposure decision.
 
 Using a different database library? Report queries yourself from your own instrumentation:
 
@@ -285,23 +357,19 @@ app.add_middleware(RequestLogMiddleware)
 
 #### Key Features
 
-- **Request/response logging**: logs the method, path, query parameters and referrer when a request starts, and the user, status code, content type and elapsed time when it finishes.
+- **Request/response logging**: logs the method, path and request ID when a request starts, and the user, status code, content type and elapsed time when it finishes.
 - **Request IDs**: reuses an incoming `X-Request-ID` header when present, otherwise generates a UUID.
 - **Context propagation**: binds `request_id`, `ip_address` and `user_agent` to the context variables, so every log record emitted while handling the request carries them automatically.
-- **Streaming support**: emits `Streaming started` and `Streaming finished` records around streaming responses.
+- **Streaming support**: tracks streaming lifecycle and emits `Streaming started` and `Streaming finished` records only when `REQUEST_LOGGING.LOG_STREAMING_EVENTS` is enabled.
 - **Cancellation handling**: logs a warning and releases the bound context when a client disconnects mid-request.
-- **SQL query logging**: includes the queries a request issued when `LOG_SQL_QUERIES_ENABLE` is on.
+- **SQL query logging**: includes queries recorded during the request when `REQUEST_LOGGING.LOG_SQL_QUERIES` is enabled. SQL diagnostics are disabled by default because SQL statements may contain sensitive literal values.
 
-The middleware is pure ASGI, so it forwards websocket and lifespan traffic untouched.
+The middleware is pure ASGI, so it forwards websocket and lifespan traffic untouched. Query parameters, request bodies, error-response bodies, SQL diagnostics and additional streaming lifecycle events are independently opt-in.
 
 Example output:
 
 ```
-INFO | 2026-01-05 12:00:00 | request_middleware | REQUEST STARTED:
-	method=GET
-	path=/api/items
-	query_params={'page': '2'}
-	referrer=None
+INFO | 2026-01-05 12:00:00 | request_middleware | REQUEST STARTED: method=GET path=/api/items request_id=a3f1...
  | {'request_id': 'a3f1...', 'ip_address': '10.0.0.4', 'user_agent': 'curl/8.4.0'}
 
 INFO | 2026-01-05 12:00:00 | request_middleware | REQUEST FINISHED:
@@ -334,7 +402,7 @@ async def list_items():
 
 ### MonitorLogSizeMiddleware
 
-`MonitorLogSizeMiddleware` runs the log size audit at most once a week, warning the admin by email when the log directory exceeds `LOG_DIR_SIZE_LIMIT`. It is installed by `setup_logging` alongside the request middleware.
+`MonitorLogSizeMiddleware` runs the log size audit at most once a week, warning the admin by email when the log directory exceeds `LOG_DIR_SIZE_LIMIT`. It is installed by `setup_logging` when you use the legacy flat-key configuration path. The structured `FASTAPI_LOGGING` contract installs `RequestLogMiddleware` only; it does not enable the legacy file-size audit.
 
 The "last run" timestamp is kept in a small in-process cache. If you run several workers and want them to share it, install your own backend:
 
@@ -422,10 +490,15 @@ That registers the page at `/log-iboard/` and mounts its assets at `/fastapi-log
 
 2. Restrict access.
 
-FastAPI has no permission framework, so access is controlled by a predicate you can replace. The default reads `is_superuser` from `scope["user"]` and **denies anonymous requests**, which matches how Django's `AnonymousUser` failed the same check. Install your own rule with `set_permission_check`:
+FastAPI has no built-in permission framework. The default predicate reads `is_superuser` from `scope["user"]` and **denies anonymous requests**. Install authentication middleware that populates `scope["user"]` before relying on the default policy.
+
+Prefer an application-scoped predicate so that separate FastAPI applications in the same process cannot affect one another:
 
 ```python
+from fastapi import FastAPI
 from fastapi_logging_kit.routers import set_permission_check
+
+app = FastAPI()
 
 
 def only_admins(request) -> bool:
@@ -433,10 +506,10 @@ def only_admins(request) -> bool:
     return bool(user and user.role == "admin")
 
 
-set_permission_check(only_admins)
+set_permission_check(only_admins, app=app)
 ```
 
-Users failing the check are shown an "Access Denied" page with a `403` status.
+Calling `set_permission_check(check)` without `app` remains available as a process-wide default for backward compatibility. Permission callbacks must be synchronous and return a real `bool`; asynchronous callbacks and non-boolean results fail closed. Users failing the check are shown an "Access Denied" page with a `403` status.
 
 ### Using LogiBoard
 
@@ -445,9 +518,9 @@ Visit `/log-iboard/` and upload a `.zip` of your logs. LogiBoard renders the dir
 
 ## Settings
 
-By default, `fastapi_logging_kit` uses a built-in configuration that requires no additional setup. However, you can customize the logging settings by passing a configuration mapping to `setup_logging`, or by setting `FASTAPI_LOGGING_`-prefixed environment variables.
+For new applications, `setup_logging(app)` uses the structured defaults described in Quick Start. The flat-key settings below are retained for migration and are used only when you select the legacy configuration path by passing legacy keys or loading legacy settings. Those legacy values can also be supplied through `FASTAPI_LOGGING_`-prefixed environment variables.
 
-#### Default configuration:
+#### Legacy default configuration:
 
 ```python
 {
@@ -653,6 +726,16 @@ Here's a breakdown of the available configuration options:
       - **Description**: Whether the email body is rendered with the packaged HTML template.
       - **Default**: `True`
 
+    - `MAX_CONCURRENT`:
+      - **Type**: `int` (1–64)
+      - **Description**: Maximum number of simultaneous background email deliveries per worker process. Excess notifications are dropped rather than queued.
+      - **Default**: `4`
+
+    - `SMTP_TIMEOUT`:
+      - **Type**: `int` (1–120 seconds)
+      - **Description**: Network timeout for SMTP operations.
+      - **Default**: `10`
+
 `EMAIL`
 -------
 
@@ -663,7 +746,7 @@ Here's a breakdown of the available configuration options:
 
 ## Log Rotation
 
-By default `fastapi_logging_kit` writes to plain files that grow forever. Rotation is opt-in through `LOG_ROTATION`, and can be overridden per level with `LOG_ROTATION_OVERRIDES`.
+Under the legacy flat-key configuration, file logging may be enabled; rotation is opt-in through `LOG_ROTATION` and can be overridden per level with `LOG_ROTATION_OVERRIDES`. The standard rotating handlers are not multi-process safe: for Gunicorn/Uvicorn workers, prefer stdout aggregation or an external rotation mechanism.
 
 `LOG_ROTATION`
 --------------
@@ -915,3 +998,103 @@ export FASTAPI_LOGGING_EMAIL='{"EMAIL_HOST":"smtp.example.com","EMAIL_PORT":587,
 | `django.core.cache` | An in-process cache, replaceable via `set_cache` |
 
 The formatters, filters, context variable manager, rotation handling and format options are unchanged.
+
+## Explicit `FASTAPI_LOGGING` configuration
+
+For an application-controlled logging setup, pass the `FASTAPI_LOGGING`
+configuration to `setup_logging`. The package does not require a particular
+settings module, environment loader, or Pydantic Settings implementation.
+
+```python
+from fastapi import FastAPI
+from fastapi_logging_kit import setup_logging
+
+FASTAPI_LOGGING = {
+    "ENABLED": True,
+    "COMPONENTS": {},
+    "REQUEST_LOGGING": {
+        "ENABLED": True,
+        "LOG_REQUEST_STARTED": False,
+        "LOG_REQUEST_FINISHED": True,
+        "EXCLUDED_PATHS": ["/health", "/metrics"],
+        "EXCLUDED_PATH_PREFIXES": ["/internal"],
+        "QUERY_PARAMS_ENABLED": False,
+        "MAX_REQUEST_ID_LENGTH": 80,
+        "REQUEST_BODY_ENABLED": False,
+        "ERROR_RESPONSE_BODY_ENABLED": False,
+        "MAX_BODY_BYTES": 2048,
+        "MAX_ERROR_RESPONSE_BYTES": 2048,
+        "TRUSTED_PROXIES": [],
+    },
+}
+
+app = FastAPI()
+setup_logging(app, config=FASTAPI_LOGGING)
+```
+
+If no `LOGGING` dictionary is supplied, the structured configuration uses
+an additive component activator: it does not replace the host's root logger,
+log level, or third-party handlers. Installed components are owned by the
+package. A custom handler can be declared and explicitly attached to root:
+
+```python
+FASTAPI_LOGGING = {
+    "COMPONENTS": {
+        "handlers": {"audit": {"class": "logging.NullHandler"}},
+        "root_handlers": ["audit"],
+    }
+}
+```
+
+The `COMPONENTS` contract supports `formatters`, `filters`, `handlers`,
+`loggers`, `replace`, `disable`, `root_handlers`, and `package_handlers`.
+Naming conflicts require explicit replacement; invalid references raise
+`ComponentConfigurationError` before handlers are activated.
+
+Developers who explicitly provide `LOGGING` opt into the process-wide
+semantics of `logging.config.dictConfig`, including replacement of the root
+configuration when it is present in that dictionary. `disable_existing_loggers`
+defaults to `False`. Do not use that option expecting an additive merge.
+
+Request logging operates through pure ASGI middleware. It does not buffer
+successful responses. Request IDs are checked for safe characters and size,
+then returned in the configured response header. Forwarded IP addresses are
+only trusted when the immediate peer belongs to `TRUSTED_PROXIES` (CIDR
+networks or individual IPs); otherwise the ASGI client address is used.
+When deploying behind a reverse proxy, coordinate these settings with your
+ASGI server's own forwarded-header trust configuration.
+
+Query parameters are omitted by default. Set `QUERY_PARAMS_ENABLED=True` to
+log bounded, JSON-escaped query values; common credential keys are redacted,
+and additional exclusions can be configured through `EXCLUDED_FIELDS` and
+`EXCLUDED_FIELDS_BY_PATH`.
+
+SQL query capture is independently opt-in through `LOG_SQL_QUERIES`. Its
+output is bounded by `MAX_SQL_BYTES` and `MAX_SQL_QUERIES`. Streaming lifecycle
+records are independently opt-in through `LOG_STREAMING_EVENTS`; the
+middleware still propagates request context through streams when those extra
+events are disabled.
+
+JSON request-body diagnostics and JSON error-response diagnostics are also
+opt-in through `REQUEST_BODY_ENABLED` and `ERROR_RESPONSE_BODY_ENABLED`.
+Request-body capture is limited to POST, PUT, and PATCH requests, observes
+JSON media types only, and captures only chunks that the application itself
+receives. Error-response capture is restricted to
+HTTP status codes 400 and above and JSON media types. Both paths enforce byte
+limits (maximum configurable value: 64 KiB), recursively redact sensitive
+fields, and never log raw malformed JSON, multipart, or binary bodies. Values
+that exceed the configured limit are discarded and represented by a marker;
+request/response messages continue to the application unchanged. Keep both
+options disabled unless the diagnostic value justifies logging potentially
+sensitive application data.
+
+The original flat-key API remains available for compatibility with existing
+installations. New applications should use the structured configuration shown
+above. Repeating the same setup on a single FastAPI application does not
+register duplicate request middleware; attempting to reconfigure it with a
+different mapping raises a descriptive error. Call setup before the ASGI
+application begins serving requests.
+
+Request middleware settings are copied into each FastAPI application, but
+Python's logging registry and logger/handler graph are process-wide. Separate
+FastAPI applications in one process do not receive isolated logging registries.

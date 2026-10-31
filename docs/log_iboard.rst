@@ -5,7 +5,7 @@ The ``LogiBoard`` in the ``fastapi_logging_kit`` package provides an interface f
 
 .. note::
 
-   **Restricted Access**: access is controlled by a replaceable permission predicate. The default implementation denies anonymous requests and requires ``is_superuser`` on ``scope["user"]``. Users failing the check are shown an "Access Denied" page with a ``403`` status.
+   **Restricted Access**: access is controlled by a replaceable permission predicate. The default implementation denies anonymous requests and requires ``is_superuser`` on ``scope["user"]``. The application must install authentication middleware that populates ``scope["user"]`` (for example, Starlette's ``AuthenticationMiddleware``); without an authenticated user, access is denied with ``403``.
 
 Setup Instructions
 ------------------
@@ -20,11 +20,17 @@ Setup Instructions
    That registers the page at ``/log-iboard/`` and mounts its assets at ``/fastapi-logging-kit/static``. There is no separate static-file collection step — the packaged assets are served by the application itself.
 
 2. **Restrict access**:
-   FastAPI has no permission framework, so access is controlled by a predicate you can replace. The default reads ``is_superuser`` from ``scope["user"]`` and **denies anonymous requests**, which matches how Django's ``AnonymousUser`` failed the same check. Install your own rule with ``set_permission_check``:
+   FastAPI has no built-in permission framework, so access is controlled by a predicate you can replace. The default reads ``is_superuser`` from ``scope["user"]`` and **denies anonymous requests**. Install authentication middleware to populate that scope value.
+
+   Prefer an application-scoped predicate when configuring a specific app. This prevents policies from leaking between multiple FastAPI applications in the same process:
 
    .. code-block:: python
 
+      from fastapi import FastAPI
       from fastapi_logging_kit.routers import set_permission_check
+
+
+      app = FastAPI()
 
 
       def only_admins(request) -> bool:
@@ -32,7 +38,9 @@ Setup Instructions
           return bool(user and user.role == "admin")
 
 
-      set_permission_check(only_admins)
+      set_permission_check(only_admins, app=app)
+
+   Calling ``set_permission_check(check)`` without ``app`` remains available as a process-wide default for compatibility. Permission callbacks must be synchronous and return a real ``bool``; asynchronous callbacks and non-boolean results are rejected rather than treated as truthy.
 
 Using LogiBoard
 ---------------
