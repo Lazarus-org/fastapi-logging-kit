@@ -1,47 +1,171 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
-    name: Python ${{ matrix.python-version }}
+    name: ${{ matrix.tox-env }} (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
-
+    timeout-minutes: 20
     strategy:
+      fail-fast: false
       matrix:
-        python-version:
-          - '3.9'
-          - '3.10'
-          - '3.11'
-          - '3.12'
-          - '3.13'
-          - '3.14'
+        include:
+          - python-version: "3.11"
+            tox-env: py311-fastapi0100
+          - python-version: "3.11"
+            tox-env: py311-fastapi0120
+          - python-version: "3.12"
+            tox-env: py312-fastapi0100
+          - python-version: "3.12"
+            tox-env: py312-fastapi0120
+          - python-version: "3.13"
+            tox-env: py313-fastapi0100
+          - python-version: "3.13"
+            tox-env: py313-fastapi0120
+          - python-version: "3.14"
+            tox-env: py314-fastapi0100
+          - python-version: "3.14"
+            tox-env: py314-fastapi0120
+          - python-version: "3.15"
+            tox-env: py315-fastapi0120
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            tox.ini
 
-      - name: Install dependencies
+      - name: Install tox
         run: |
           python -m pip install --upgrade pip
-          pip install coverage codecov pytest poetry
-          pip install -r packages/requirements.txt
-          pip install -r packages/requirements-dev.txt
+          python -m pip install "tox>=4.65,<5"
 
-      - name: Run tests with coverage
-        run: pytest --cov=fastapi_logging_kit --cov-report=xml
+      - name: Run compatibility environment
+        run: tox -e "${{ matrix.tox-env }}"
 
-      - name: Run Tox tests
-        run: tox
+  quality:
+    name: Static and browser-side security checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Run pre-commit hooks
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install pre-commit
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "pre-commit>=4.4,<5"
+
+      - name: Run repository hooks
         run: pre-commit run --all-files --config=.pre-commit-config-ci.yaml
 
-      - name: Upload coverage to Codecov
-        run: codecov
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      - name: Install runtime dependencies and type/lint checkers
+        run: |
+          python -m pip install -r packages/requirements.txt
+          python -m pip install "SQLAlchemy>=2.0.52,<3.0" "mypy>=1.11.1,<2" "pylint>=3.2.6,<4"
+
+      - name: Run static type checks
+        run: mypy fastapi_logging_kit
+
+      - name: Run Pylint
+        run: pylint -rn -sn --rcfile=pyproject.toml fastapi_logging_kit
+
+      - name: Run LogiBoard security regressions
+        run: node --test fastapi_logging_kit/tests/js/logiboard-security.test.mjs
+
+  build:
+    name: Build and inspect distributions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+
+      - name: Build wheel and source distribution
+        run: python -m build --sdist --wheel
+
+      - name: Validate distribution metadata
+        run: python -m twine check dist/*
+
+      - name: Inspect wheel and source distribution contents
+        run: python scripts/verify_distributions.py dist
+
+      - name: Install wheel with SQLAlchemy extra
+        run: |
+          wheel="$(find dist -maxdepth 1 -name '*.whl' -print -quit)"
+          distribution_name="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["name"])')"
+          echo "FASTAPI_LOGGING_DISTRIBUTION_NAME=${distribution_name}" >> "$GITHUB_ENV"
+          python -m pip install "${wheel}[sqlalchemy]"
+
+      - name: Smoke-test installed package and CLI
+        run: |
+          cd /tmp
+          python - "$FASTAPI_LOGGING_DISTRIBUTION_NAME" <<'PY'
+          from importlib.metadata import version
+          from importlib.resources import files
+          import sys
+
+          import fastapi_logging_kit
+          import sqlalchemy
+
+          package = files("fastapi_logging_kit")
+          assert fastapi_logging_kit.__version__ == version(sys.argv[1])
+          assert package.joinpath("py.typed").is_file()
+          assert package.joinpath("templates/log_iboard.html").is_file()
+          assert package.joinpath("static/LogiBoard/js/scripts.js").is_file()
+          assert sqlalchemy.__version__
+          print("Installed wheel smoke test passed.")
+          PY
+          fastapi-logging-kit --help
+
+      - name: Install documentation dependencies
+        run: python -m pip install -r docs/requirements.txt
+
+      - name: Build documentation without warnings
+        run: sphinx-build -W --keep-going -b html docs /tmp/fastapi-logging-kit-docs
+
+      - name: Upload distributions for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastapi-logging-kit-distributions
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
