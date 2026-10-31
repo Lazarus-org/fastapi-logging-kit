@@ -3,8 +3,10 @@
 import gzip
 import logging
 import os
+import re
 import shutil
 import tarfile
+import tempfile
 import zipfile
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -67,7 +69,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS("No rotated log files found."))
             return
 
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S_%f")
         archive_dir = os.path.join(log_dir, "archive", timestamp)
         bundle_path = f"{archive_dir}.{bundle}" if bundle else None
 
@@ -99,27 +101,39 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------
 
     def _collect_rotated_files(self, log_dir: str) -> List[str]:
-        """Walk *log_dir* and return paths of rotated (non-active) log files.
+        """Select only recognized rotated log files, excluding symlinks.
 
-        Active files match exactly ``<level>.log`` (e.g. ``debug.log``).
-        Everything else (``debug.log.1``, ``info.log.gz``,
-        ``error.log.2024-03-01``, etc.) is considered rotated.
-
+        Active log files, arbitrary files, and the archive tree are never
+        moved. Relative directory structure is retained by ``_move_files``.
         """
         from fastapi_logging_kit.constants.default_settings import DefaultLoggingSettings
 
-        levels = [lvl.lower() for lvl in DefaultLoggingSettings().log_levels]
-        active_names = {f"{lvl}.log" for lvl in levels}
+        levels = set(DefaultLoggingSettings().log_levels)
+        configured = settings_manager.log_levels
+        if isinstance(configured, (list, tuple)):
+            levels.update(level for level in configured if isinstance(level, str))
+        prefixes = "|".join(
+            re.escape(level.lower()) for level in sorted(levels) if level
+        )
+        if not prefixes:
+            return []
 
+        rotated_name = re.compile(
+            rf"^(?:{prefixes})\.(?:log|json|xml)\."
+            rf"(?:[1-9][0-9]*|[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}"
+            rf"(?:_[0-9]{{2}}(?:-[0-9]{{2}}(?:-[0-9]{{2}})?)?)?)"
+            rf"(?:\.gz)?$"
+        )
         rotated: List[str] = []
-        for root, _dirs, files in os.walk(log_dir):
-            # Never descend into existing archive subdirectories
-            if "archive" in root.split(os.sep):
-                continue
-            for fname in files:
-                if fname not in active_names:
-                    rotated.append(os.path.join(root, fname))
-
+        for root, dirs, files in os.walk(log_dir, followlinks=False):
+            dirs[:] = [
+                name for name in dirs
+                if name != "archive" and not os.path.islink(os.path.join(root, name))
+            ]
+            for filename in files:
+                path = os.path.join(root, filename)
+                if not os.path.islink(path) and rotated_name.fullmatch(filename):
+                    rotated.append(path)
         return sorted(rotated)
 
     # ------------------------------------------------------------------
@@ -129,23 +143,42 @@ class Command(BaseCommand):
     def _move_files(
         self, rotated_files: List[str], archive_dir: str, compress: bool
     ) -> List[str]:
-        """Move *rotated_files* into *archive_dir*, gzipping if requested."""
-        os.makedirs(archive_dir, exist_ok=True)
+        """Archive rotated files atomically while retaining nested paths."""
+        log_dir = os.path.abspath(settings_manager.log_dir)
+        os.makedirs(archive_dir, exist_ok=False)
         archived: List[str] = []
 
-        for src in rotated_files:
-            filename = os.path.basename(src)
+        for source in rotated_files:
+            source_path = os.path.abspath(source)
+            relative = os.path.relpath(source_path, log_dir)
+            if relative == os.pardir or relative.startswith(os.pardir + os.sep):
+                raise ValueError("Rotated log path escapes LOG_DIR")
 
-            if compress and not src.endswith(".gz"):
-                dest = os.path.join(archive_dir, filename + ".gz")
-                with open(src, "rb") as f_in, gzip.open(dest, "wb") as f_out:
-                    shutil.copyfileobj(f_in, f_out)
-                os.remove(src)
+            destination = os.path.join(archive_dir, relative)
+            if compress and not source_path.endswith(".gz"):
+                destination += ".gz"
+            os.makedirs(os.path.dirname(destination), exist_ok=True)
+            if os.path.lexists(destination):
+                raise FileExistsError(destination)
+
+            if compress and not source_path.endswith(".gz"):
+                descriptor, temporary = tempfile.mkstemp(
+                    prefix=".fastapi-logging-kit-", suffix=".tmp",
+                    dir=os.path.dirname(destination),
+                )
+                try:
+                    with os.fdopen(descriptor, "wb") as raw:
+                        with gzip.GzipFile(fileobj=raw, mode="wb") as compressed:
+                            with open(source_path, "rb") as original:
+                                shutil.copyfileobj(original, compressed)
+                    os.replace(temporary, destination)
+                    os.remove(source_path)
+                finally:
+                    if os.path.exists(temporary):
+                        os.unlink(temporary)
             else:
-                dest = os.path.join(archive_dir, filename)
-                shutil.move(src, dest)
-
-            archived.append(dest)
+                shutil.move(source_path, destination)
+            archived.append(destination)
 
         return archived
 

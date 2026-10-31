@@ -2,11 +2,12 @@ import os
 import sys
 import tarfile
 import zipfile
+from types import SimpleNamespace
 from typing import Any, List
 
 import pytest
 
-from fastapi_logging_kit.commands.archive_logs import BUNDLE_FORMATS, run
+from fastapi_logging_kit.commands.archive_logs import BUNDLE_FORMATS, Command, run
 from fastapi_logging_kit.settings import settings_manager
 from fastapi_logging_kit.tests.constants import PYTHON_VERSION, PYTHON_VERSION_REASON
 
@@ -53,6 +54,141 @@ class TestArchiveLogsCommand:
 
         assert "No rotated log files found." in out.getvalue()
         assert _archive_subdirs(temp_log_directory) == []
+
+    def test_empty_configured_and_default_levels_produce_no_candidates(
+        self, temp_log_directory: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test the defensive empty-level branch in the rotation scanner."""
+        monkeypatch.setattr(
+            "fastapi_logging_kit.constants.default_settings.DefaultLoggingSettings",
+            lambda: SimpleNamespace(log_levels=[]),
+        )
+        settings_manager.load({"LOG_DIR": temp_log_directory, "LOG_FILE_LEVELS": []})
+
+        assert Command(echo=False)._collect_rotated_files(temp_log_directory) == []
+
+    def test_rejects_sources_outside_log_directory(
+        self, temp_log_directory: str, tmp_path: Any
+    ) -> None:
+        """Test that a caller cannot move arbitrary files into the archive."""
+        outside = tmp_path / "outside.log.1"
+        outside.write_text("outside", encoding="utf-8")
+        settings_manager.load({"LOG_DIR": temp_log_directory})
+
+        with pytest.raises(ValueError, match="escapes LOG_DIR"):
+            Command(echo=False)._move_files(
+                [str(outside)],
+                os.path.join(temp_log_directory, "archive", "test"),
+                False,
+            )
+
+    def test_rejects_existing_archive_destination(
+        self, temp_log_directory: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that an existing destination is never overwritten."""
+        source = os.path.join(temp_log_directory, "info.log.1")
+        with open(source, "w", encoding="utf-8") as file:
+            file.write("source")
+        archive_dir = os.path.join(temp_log_directory, "archive", "test")
+        destination = os.path.join(archive_dir, "info.log.1")
+        settings_manager.load({"LOG_DIR": temp_log_directory})
+        original_lexists = os.path.lexists
+
+        def report_destination(path: str) -> bool:
+            return True if path == destination else original_lexists(path)
+
+        monkeypatch.setattr(os.path, "lexists", report_destination)
+        with pytest.raises(FileExistsError):
+            Command(echo=False)._move_files([source], archive_dir, False)
+        assert os.path.isfile(source)
+
+    def test_compression_failure_cleans_temporary_file(
+        self, temp_log_directory: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that failed atomic gzip publication preserves source and cleans temp."""
+        source = os.path.join(temp_log_directory, "info.log.1")
+        with open(source, "wb") as file:
+            file.write(b"source")
+        archive_dir = os.path.join(temp_log_directory, "archive", "test")
+        settings_manager.load({"LOG_DIR": temp_log_directory})
+
+        def fail_replace(source_path: str, destination_path: str) -> None:
+            raise OSError("simulated atomic publication failure")
+
+        monkeypatch.setattr(os, "replace", fail_replace)
+        with pytest.raises(OSError, match="simulated"):
+            Command(echo=False)._move_files([source], archive_dir, True)
+
+        assert os.path.isfile(source)
+        assert not [
+            name for name in os.listdir(archive_dir)
+            if name.startswith(".fastapi-logging-kit-")
+        ]
+
+    def test_ignores_unrelated_files(self, temp_log_directory: str) -> None:
+        """Test that arbitrary files are never moved into the log archive."""
+        unrelated = os.path.join(temp_log_directory, "notes.txt")
+        unknown_rotation = os.path.join(temp_log_directory, "application.log.1")
+        with open(unrelated, "w", encoding="utf-8") as file:
+            file.write("keep me")
+        with open(unknown_rotation, "w", encoding="utf-8") as file:
+            file.write("not a configured log")
+        settings_manager.load({"LOG_DIR": temp_log_directory})
+
+        out = run(echo=False)
+
+        assert "No rotated log files found." in out.getvalue()
+        assert os.path.exists(unrelated)
+        assert os.path.exists(unknown_rotation)
+        assert _archive_subdirs(temp_log_directory) == []
+
+    def test_preserves_nested_directory_layout(self, temp_log_directory: str) -> None:
+        """Test that rotated files in subdirectories retain their paths."""
+        nested = os.path.join(temp_log_directory, "worker")
+        os.makedirs(nested)
+        rotated = os.path.join(nested, "info.log.2")
+        with open(rotated, "w", encoding="utf-8") as file:
+            file.write("nested rotation")
+        settings_manager.load({"LOG_DIR": temp_log_directory})
+
+        run(echo=False)
+
+        archive_dir = _archive_subdirs(temp_log_directory)[0]
+        archived = os.path.join(archive_dir, "worker", "info.log.2")
+        assert os.path.isfile(archived)
+        assert not os.path.exists(rotated)
+
+    def test_uses_custom_configured_log_levels(self, temp_log_directory: str) -> None:
+        """Test that custom configured levels are recognized as log files."""
+        rotated = os.path.join(temp_log_directory, "audit.log.1")
+        with open(rotated, "w", encoding="utf-8") as file:
+            file.write("custom level")
+        settings_manager.load(
+            {"LOG_DIR": temp_log_directory, "LOG_FILE_LEVELS": ["INFO", "AUDIT"]}
+        )
+
+        run(echo=False)
+
+        archive_dir = _archive_subdirs(temp_log_directory)[0]
+        assert os.path.isfile(os.path.join(archive_dir, "audit.log.1"))
+
+    def test_ignores_symlinked_rotated_files(self, temp_log_directory: str) -> None:
+        """Test that symlinks are not followed or moved during archive scans."""
+        target = os.path.join(temp_log_directory, "info.log.1")
+        link = os.path.join(temp_log_directory, "debug.log.2")
+        with open(target, "w", encoding="utf-8") as file:
+            file.write("target")
+        try:
+            os.symlink(target, link)
+        except (NotImplementedError, OSError):
+            pytest.skip("Symlinks are not available on this platform")
+        settings_manager.load({"LOG_DIR": temp_log_directory})
+
+        run(echo=False)
+
+        archive_dir = _archive_subdirs(temp_log_directory)[0]
+        assert os.path.isfile(os.path.join(archive_dir, "info.log.1"))
+        assert os.path.islink(link)
 
     def test_skips_existing_archive_directory(
         self, log_dir_with_rotated_files: str
