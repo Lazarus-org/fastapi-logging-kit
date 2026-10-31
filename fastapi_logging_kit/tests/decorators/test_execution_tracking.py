@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import sys
 from typing import Any
@@ -7,7 +8,7 @@ import pytest
 from fastapi_logging_kit.decorators.execution_tracking import execution_tracker
 from fastapi_logging_kit.settings import settings_manager
 from fastapi_logging_kit.tests.constants import PYTHON_VERSION, PYTHON_VERSION_REASON
-from fastapi_logging_kit.utils.sql import record_query
+from fastapi_logging_kit.utils.sql import get_queries, query_capture, record_query
 
 pytestmark = [
     pytest.mark.decorators,
@@ -240,3 +241,93 @@ class TestQueryTracking:
 
         assert "DEBUG mode is disabled" in caplog.text
         assert "Database Queries" not in caplog.text
+
+
+
+class TestAsyncExecutionTracking:
+    """Async execution tracking and query-history preservation."""
+
+    async def test_tracks_async_function_after_await(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        _enable_debug()
+
+        @execution_tracker(log_queries=True)
+        async def query_once() -> str:
+            await asyncio.sleep(0)
+            record_query("SELECT async", 0.01)
+            return "done"
+
+        with caplog.at_level(logging.INFO):
+            assert await query_once() == "done"
+
+        assert "Database Queries: 1 queries" in caplog.text
+
+    async def test_logs_and_reraises_async_failure(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        @execution_tracker()
+        async def failing() -> None:
+            await asyncio.sleep(0)
+            raise RuntimeError("async boom")
+
+        with caplog.at_level(logging.ERROR):
+            with pytest.raises(RuntimeError, match="async boom"):
+                await failing()
+
+        assert "Error executing function" in caplog.text
+        assert "async boom" in caplog.text
+
+    def test_does_not_clear_an_enclosing_request_query_scope(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        _enable_debug()
+        with query_capture(max_bytes=4096):
+            record_query("SELECT before", 0.01)
+
+            @execution_tracker(log_queries=True)
+            def tracked() -> None:
+                record_query("SELECT during", 0.02)
+
+            with caplog.at_level(logging.INFO):
+                tracked()
+
+            assert len(get_queries()) == 2
+            assert "Database Queries: 1 queries" in caplog.text
+
+    def test_isolates_query_history_outside_a_request_scope(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        _enable_debug()
+        record_query("SELECT existing", 0.01)
+        previous = get_queries()
+
+        @execution_tracker(log_queries=True)
+        def tracked() -> None:
+            record_query("SELECT isolated", 0.02)
+
+        with caplog.at_level(logging.INFO):
+            tracked()
+
+        assert get_queries() is previous
+        assert [item["sql"] for item in get_queries()] == ["SELECT existing"]
+        assert "Database Queries: 1 queries" in caplog.text
+
+
+
+def test_execution_metrics_are_skipped_when_level_is_filtered(caplog):
+    """Avoid building expensive metrics when the selected level is disabled."""
+
+    @execution_tracker(logging_level=logging.INFO)
+    def tracked():
+        return "done"
+
+    with caplog.at_level(
+        logging.ERROR,
+        logger="fastapi_logging_kit.decorators.execution_tracking",
+    ):
+        assert tracked() == "done"
+
+    assert not any(
+        "Performance Metrics" in record.getMessage() for record in caplog.records
+    )
