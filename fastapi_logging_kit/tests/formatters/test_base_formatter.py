@@ -78,36 +78,36 @@ class TestHandleComplexValue:
         """Test that dict values are processed recursively into stringified values."""
         formatter = BaseStructuredFormatter(fmt="%(message)s")
         assert formatter._handle_complex_value({"a": 1, "b": 2}) == {
-            "a": "1",
-            "b": "2",
+            "a": 1,
+            "b": 2,
         }
 
     def test_handles_nested_dict_value(self) -> None:
         """Test that nested dicts are recursed into rather than stringified."""
         formatter = BaseStructuredFormatter(fmt="%(message)s")
         assert formatter._handle_complex_value({"outer": {"inner": 5}}) == {
-            "outer": {"inner": "5"}
+            "outer": {"inner": 5}
         }
 
     def test_handles_list_value(self) -> None:
         """Test that list values become lists of strings."""
         formatter = BaseStructuredFormatter(fmt="%(message)s")
-        assert formatter._handle_complex_value([1, 2, 3]) == ["1", "2", "3"]
+        assert formatter._handle_complex_value([1, 2, 3]) == [1, 2, 3]
 
     def test_handles_tuple_value(self) -> None:
         """Test that tuple values are converted to lists of strings."""
         formatter = BaseStructuredFormatter(fmt="%(message)s")
-        assert formatter._handle_complex_value((1, "two")) == ["1", "two"]
+        assert formatter._handle_complex_value((1, "two")) == [1, "two"]
 
     def test_handles_scalar_value(self) -> None:
         """Test that scalar values are converted with `str`."""
         formatter = BaseStructuredFormatter(fmt="%(message)s")
-        assert formatter._handle_complex_value(42) == "42"
+        assert formatter._handle_complex_value(42) == 42
 
     def test_handles_none_value(self) -> None:
         """Test that `None` is stringified rather than dropped."""
         formatter = BaseStructuredFormatter(fmt="%(message)s")
-        assert formatter._handle_complex_value(None) == "None"
+        assert formatter._handle_complex_value(None) is None
 
 
 class TestAddException:

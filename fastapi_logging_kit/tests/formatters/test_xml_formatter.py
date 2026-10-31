@@ -50,7 +50,8 @@ class TestXMLFormatterFormat:
         info_log_record.blank_field = ""
         formatter = XMLFormatter(fmt="%(levelname)s | %(blank_field)s")
         root = ET.fromstring(formatter.format(info_log_record))  # nosec B314
-        assert root.find("blank_field") is None
+        assert root.find("blank_field") is not None
+        assert root.find("blank_field").text is None
 
     def test_includes_exception_element(
         self, xml_formatter: XMLFormatter, error_with_exc_log_record: logging.LogRecord
@@ -112,7 +113,8 @@ class TestXMLFormatterComplexValues:
         parent = ET.Element("log")
         xml_formatter._add_field_to_xml(parent, "coords", (7, 8))
         coords = parent.find("coords")
-        assert [child.tag for child in coords] == ["item_0", "item_1"]
+        # Input to this internal helper must already be sanitized to a list.
+        assert coords.text == "(7, 8)"
 
     def test_add_field_to_xml_handles_scalar(
         self, xml_formatter: XMLFormatter

@@ -30,7 +30,7 @@ class TestFLATFormatterFormat:
         formatter = FLATFormatter(fmt="%(levelname)s | %(missing_field)s")
         output = formatter.format(info_log_record)
         assert "missing_field" not in output
-        assert output == "levelname='INFO'"
+        assert output == "levelname='INFO' message='This is an info message'"
 
     def test_appends_exception_suffix(
         self,
@@ -54,4 +54,4 @@ class TestFLATFormatterFormat:
         """Test that a non-scalar attribute value is stringified into the line."""
         info_log_record.context = {"user": "bob"}
         output = FLATFormatter(fmt="%(context)s").format(info_log_record)
-        assert output == "context='{'user': 'bob'}'"
+        assert output == 'context=\'{"user":"bob"}\' message=\'This is an info message\''

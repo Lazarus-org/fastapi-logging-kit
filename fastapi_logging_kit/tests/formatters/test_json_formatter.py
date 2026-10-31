@@ -1,148 +1,58 @@
+"""Contract tests: messages are never parsed as ad-hoc key/value syntax."""
+
 import json
 import logging
-import sys
 
 import pytest
 
 from fastapi_logging_kit.formatters import JSONFormatter
-from fastapi_logging_kit.tests.constants import PYTHON_VERSION, PYTHON_VERSION_REASON
 
-pytestmark = [
-    pytest.mark.formatters,
-    pytest.mark.json_formatter,
-    pytest.mark.skipif(sys.version_info < PYTHON_VERSION, reason=PYTHON_VERSION_REASON),
-]
+pytestmark = [pytest.mark.formatters, pytest.mark.json_formatter]
 
 
-class TestJSONFormatterFormat:
-    """Test suite for `JSONFormatter.format`."""
-
-    def test_formats_record_as_valid_json(
-        self, json_formatter: JSONFormatter, info_log_record: logging.LogRecord
-    ) -> None:
-        """Test that the formatter emits parseable JSON containing the specifiers."""
-        payload = json.loads(json_formatter.format(info_log_record))
-        assert payload["levelname"] == "INFO"
-        assert payload["message"] == "This is an info message"
-        assert "asctime" in payload
-
-    def test_message_without_key_value_pairs_is_preserved(
-        self, json_formatter: JSONFormatter, debug_log_record: logging.LogRecord
-    ) -> None:
-        """Test that a plain message is kept intact when no pairs are present."""
-        payload = json.loads(json_formatter.format(debug_log_record))
-        assert payload["message"] == "This is a debug message"
-
-    def test_includes_exception_when_present(
-        self,
-        json_formatter: JSONFormatter,
-        error_with_exc_log_record: logging.LogRecord,
-    ) -> None:
-        """Test that exception information is embedded under the `exception` key."""
-        payload = json.loads(json_formatter.format(error_with_exc_log_record))
-        assert "ValueError: Something went wrong" in payload["exception"]
-
-    def test_omits_exception_when_absent(
-        self, json_formatter: JSONFormatter, error_log_record: logging.LogRecord
-    ) -> None:
-        """Test that no `exception` key is emitted for records without `exc_info`."""
-        payload = json.loads(json_formatter.format(error_log_record))
-        assert "exception" not in payload
-
-    def test_cleans_newlines_and_tabs_from_message(
-        self, json_formatter: JSONFormatter, info_log_record: logging.LogRecord
-    ) -> None:
-        """Test that newlines and tabs in the message are replaced with spaces."""
-        info_log_record.msg = "line one\nline\ttwo"
-        payload = json.loads(json_formatter.format(info_log_record))
-        assert payload["message"] == "line one line two"
-
-    def test_unknown_specifier_is_serialized_as_none_string(
-        self, info_log_record: logging.LogRecord
-    ) -> None:
-        """Test that a specifier missing from the record becomes the string `None`."""
-        formatter = JSONFormatter(fmt="%(missing_field)s | %(message)s")
-        payload = json.loads(formatter.format(info_log_record))
-        assert payload["missing_field"] == "None"
+def record(message: str = "message", **kwargs: object) -> logging.LogRecord:
+    result = logging.makeLogRecord({"name": "api", "levelno": 20, "levelname": "INFO", "msg": message})
+    result.__dict__.update(kwargs)
+    return result
 
 
-class TestJSONFormatterKeyValueExtraction:
-    """Test suite for key=value extraction in `JSONFormatter`."""
-
-    def test_extracts_scalar_pairs_and_strips_them_from_message(
-        self, json_formatter: JSONFormatter, info_log_record: logging.LogRecord
-    ) -> None:
-        """Test that scalar key=value pairs are promoted to top-level JSON keys."""
-        info_log_record.msg = "User logged in user_id=42 active=true"
-        payload = json.loads(json_formatter.format(info_log_record))
-        assert payload["user_id"] == 42
-        assert payload["active"] is True
-        assert payload["message"] == "User logged in"
-
-    def test_extracts_dict_value(
-        self, json_formatter: JSONFormatter, info_log_record: logging.LogRecord
-    ) -> None:
-        """Test that a dict-shaped value is parsed into a JSON object."""
-        info_log_record.msg = "payload user={'id': 1, 'name': 'bob'}"
-        payload = json.loads(json_formatter.format(info_log_record))
-        assert payload["user"] == {"id": 1, "name": "bob"}
-
-    def test_extracts_list_value(
-        self, json_formatter: JSONFormatter, info_log_record: logging.LogRecord
-    ) -> None:
-        """Test that a list-shaped value is parsed into a JSON array."""
-        info_log_record.msg = "batch items=[1, 2, 3]"
-        payload = json.loads(json_formatter.format(info_log_record))
-        assert payload["items"] == [1, 2, 3]
-
-    def test_extracts_tuple_value(
-        self, json_formatter: JSONFormatter, info_log_record: logging.LogRecord
-    ) -> None:
-        """Test that a tuple-shaped value is parsed and serialized as an array."""
-        info_log_record.msg = "position point=(1, 2)"
-        payload = json.loads(json_formatter.format(info_log_record))
-        assert payload["point"] == [1, 2]
+def test_json_valid_with_requested_fields() -> None:
+    result = json.loads(JSONFormatter("%(levelname)s %(asctime)s %(message)s").format(record("hello")))
+    assert result["levelname"] == "INFO"
+    assert result["asctime"]
+    assert result["message"] == "hello"
 
 
-class TestJSONFormatterConvertValue:
-    """Test suite for `JSONFormatter._convert_value`."""
-
-    def test_converts_true_literal(self, json_formatter: JSONFormatter) -> None:
-        """Test that the string `true` is converted to boolean `True`."""
-        assert json_formatter._convert_value("true") is True
-
-    def test_converts_false_literal(self, json_formatter: JSONFormatter) -> None:
-        """Test that the string `false` is converted to boolean `False`."""
-        assert json_formatter._convert_value("false") is False
-
-    def test_converts_integer_literal(self, json_formatter: JSONFormatter) -> None:
-        """Test that a numeric string is converted to an int."""
-        assert json_formatter._convert_value("42") == 42
-
-    def test_falls_back_to_string_for_malformed_literal(
-        self, json_formatter: JSONFormatter
-    ) -> None:
-        """Test that an unparseable literal is returned unchanged as a string."""
-        assert json_formatter._convert_value("12abc") == "12abc"
+def test_message_is_preserved_without_interpreting_key_value_pairs() -> None:
+    message = "user_id=42 active=true password=123\nnext line"
+    result = json.loads(JSONFormatter("%(message)s").format(record(message)))
+    assert result["message"] == message
+    assert "user_id" not in result
+    assert "active" not in result
 
 
-class TestJSONFormatterMessageHelpers:
-    """Test suite for the message helper methods of `JSONFormatter`."""
+def test_unknown_specifier_is_omitted() -> None:
+    result = json.loads(JSONFormatter("%(missing_field)s %(message)s").format(record()))
+    assert "missing_field" not in result
 
-    def test_extract_key_value_pairs_returns_empty_dict(
-        self, json_formatter: JSONFormatter
-    ) -> None:
-        """Test that a message without pairs yields an empty dictionary."""
-        assert json_formatter._extract_key_value_pairs("nothing here") == {}
 
-    def test_remove_key_value_pairs_strips_pairs(
-        self, json_formatter: JSONFormatter
-    ) -> None:
-        """Test that key=value substrings are removed from the message."""
-        assert json_formatter._remove_key_value_pairs("hello a=1") == "hello"
+def test_captures_and_redacts_typed_extra_fields() -> None:
+    result = json.loads(JSONFormatter("%(message)s").format(record("logged", user_id=42, api_key="private")))
+    assert result["extra"]["user_id"] == 42
+    assert result["extra"]["api_key"] == "[REDACTED]"
 
-    def test_clean_message_removes_whitespace_control_chars(
-        self, json_formatter: JSONFormatter
-    ) -> None:
-        """Test that newlines and tabs are replaced and the result is stripped."""
-        assert json_formatter._clean_message("\ta\nb\n") == "a b"
+
+def test_exception_info_is_bounded_by_mode() -> None:
+    try:
+        raise ValueError("invalid")
+    except ValueError:
+        import sys
+        exc = sys.exc_info()
+    assert "ValueError" in json.loads(JSONFormatter("%(message)s").format(record("x", exc_info=exc)))["exception"]
+    assert json.loads(JSONFormatter("%(message)s", structured_logging={"EXCEPTION_MODE": "type"}).format(record("x", exc_info=exc)))["exception"] == "ValueError"
+    assert "exception" not in json.loads(JSONFormatter("%(message)s", structured_logging={"EXCEPTION_MODE": "omit"}).format(record("x", exc_info=exc)))
+
+
+def test_pretty_json_is_explicit() -> None:
+    assert "\n" not in JSONFormatter("%(message)s").format(record("x"))
+    assert "\n" in JSONFormatter("%(message)s", structured_logging={"JSON_COMPACT": False}).format(record("x"))
