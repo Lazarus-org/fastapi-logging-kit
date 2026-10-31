@@ -46,35 +46,29 @@ class Command(BaseCommand):
 
         self.validate_email_settings()
 
-        # Create a temporary file to store the zipped logs
-        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-            zip_path = f"{tmp_file.name}.zip"
-            tmp_file.close()
+        # Use a temporary directory so both the ZIP and its intermediate
+        # archive base path are removed on success or failure.
+        with tempfile.TemporaryDirectory(prefix="fastapi-logging-kit-") as temp_dir:
+            archive_base = os.path.join(temp_dir, "logs")
+            zip_path = shutil.make_archive(archive_base, "zip", log_dir)
 
-            # Zip the log directory
-            shutil.make_archive(tmp_file.name, "zip", log_dir)
+            email_subject = "Log Files"
+            email_body = "Please find the attached log files."
 
-        # Send the email with the zipped logs
-        email_subject = "Log Files"
-        email_body = "Please find the attached log files."
-
-        try:
-            send_email_with_attachment(
-                subject=email_subject,
-                body=email_body,
-                recipient_list=[email],
-                attachment_path=zip_path,
-            )
-            self.stdout.write(self.style.SUCCESS(f"Logs sent successfully to {email}."))
-            logger.info("Logs sent successfully to %s.", email)
-        except Exception as e:  # pylint: disable=W0718
-            self.stdout.write(self.style.ERROR(f"Failed to send logs: {e}"))
-            logger.error("Failed to send logs: %s", e)
-        finally:
-            # Clean up the temporary file if exists
-            if os.path.exists(zip_path):
-                os.remove(zip_path)
-                logger.info("Temporary zip file cleaned up successfully.")
+            try:
+                send_email_with_attachment(
+                    subject=email_subject,
+                    body=email_body,
+                    recipient_list=[email],
+                    attachment_path=zip_path,
+                )
+                self.stdout.write(
+                    self.style.SUCCESS(f"Logs sent successfully to {email}.")
+                )
+                logger.info("Logs sent successfully to %s.", email)
+            except Exception as exc:  # pylint: disable=W0718
+                self.stdout.write(self.style.ERROR(f"Failed to send logs: {exc}"))
+                logger.error("Failed to send logs: %s", exc)
 
     @staticmethod
     def validate_email_settings(require_admin_email: bool = False) -> None:
