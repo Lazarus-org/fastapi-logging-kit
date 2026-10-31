@@ -1,7 +1,9 @@
+import importlib
+from copy import deepcopy
 import logging
 import logging.config
 import os
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi_logging_kit.constants import (
     ALLOWED_EXTRA_FILE_TYPES,
@@ -23,6 +25,8 @@ from fastapi_logging_kit.constants.config_types import (
     NotifierLogLevels,
 )
 from fastapi_logging_kit.filters.log_level_filter import LoggingLevelFilter
+from fastapi_logging_kit.settings.activation import activate, forget_controlled_loggers
+from fastapi_logging_kit.settings.components import ComponentConfigurationError, compile_components
 
 
 # pylint: disable=too-many-instance-attributes, too-many-arguments, too-many-positional-arguments, too-many-locals
@@ -53,7 +57,11 @@ class LogConfig:
         log_email_notifier_log_format: FormatOption,
         log_rotation: Optional[LogRotationConfig] = None,
         log_rotation_overrides: Optional[LogRotationOverrides] = None,
+        components: Optional[dict] = None,
+        logging_config: Optional[dict] = None,
     ) -> None:
+        self.components = components if components is not None else {}
+        self.logging_config = logging_config
         self.log_levels = log_levels
         self.log_dir = log_dir
         self.log_file_formats = self._resolve_file_formats(log_file_formats)
@@ -156,28 +164,31 @@ class LogManager:
 
     def create_log_files(self) -> None:
         """Creates log files based on the log levels in the configuration."""
-        for log_level in self.log_config.log_levels:
-            fmt_type = self.log_config.log_file_format_types.get(log_level, "").lower()
-            extra_file = self.log_config.extra_log_files.get(log_level, False)
-
-            if extra_file and fmt_type.upper() in ALLOWED_EXTRA_FILE_TYPES:
-                # Use separate files for extra file format structure
-                log_file_path = os.path.join(
-                    self.log_config.log_dir,
-                    fmt_type,
-                    f"{log_level.lower()}.{fmt_type}",
-                )
-            else:
-                # Use regular log file for normal, JSON, or XML
-                log_file_path = os.path.join(
-                    self.log_config.log_dir, f"{log_level.lower()}.log"
-                )
-
+        for log_level, log_file_path in self._planned_log_files().items():
             os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
             if not os.path.exists(log_file_path):
                 with open(log_file_path, "w", encoding="utf-8"):
                     pass
             self.log_files[log_level] = log_file_path
+
+    def _planned_log_files(self) -> Dict[str, str]:
+        """Resolve every configured path without creating directories or
+        files."""
+        paths = {}
+        for level in self.log_config.log_levels:
+            kind = self.log_config.log_file_format_types.get(level, "").lower()
+            if (
+                self.log_config.extra_log_files.get(level, False)
+                and kind.upper() in ALLOWED_EXTRA_FILE_TYPES
+            ):
+                paths[level] = os.path.join(
+                    self.log_config.log_dir, kind, f"{level.lower()}.{kind}"
+                )
+            else:
+                paths[level] = os.path.join(
+                    self.log_config.log_dir, f"{level.lower()}.log"
+                )
+        return {**paths, **self.log_files}
 
     def get_log_file(self, log_level: LogLevel) -> Optional[str]:
         """Retrieves the file path for a given log level.
@@ -200,12 +211,19 @@ class LogManager:
         * ``TYPE = "none"``  → plain ``logging.FileHandler``
         * ``TYPE = "size"``  → ``RotatingFileHandler`` (or compressed variant)
         * ``TYPE = "time"``  → ``TimedRotatingFileHandler`` (or compressed variant)
+        * ``TYPE = "external"`` → ``WatchedFileHandler`` (external logrotate, POSIX)
 
         """
         rotation = self.log_config.get_rotation_config_for_level(level)
         rotation_type = str(rotation.get("TYPE", "none")).lower()
         compress = bool(rotation.get("COMPRESS", False))
         backup_count = int(rotation.get("BACKUP_COUNT", 5))
+
+        if rotation_type == "external":
+            return {
+                "class": "logging.handlers.WatchedFileHandler",
+                "filename": log_file,
+            }
 
         if rotation_type == "size":
             max_bytes = int(rotation.get("MAX_BYTES", 10_485_760))
@@ -243,15 +261,26 @@ class LogManager:
             "filename": log_file,
         }
 
-    def set_conf(self) -> None:
-        """Sets the logging configuration using the generated log files."""
+    def build_logging_dict(self) -> Dict:
+        """Build a standard dictConfig mapping without changing global
+        logging."""
+        if self.log_config.logging_config is not None:
+            custom = deepcopy(self.log_config.logging_config)
+            if not self.log_config.components:
+                return custom
+            if custom.get("incremental"):
+                raise ComponentConfigurationError(
+                    "COMPONENTS cannot extend incremental LOGGING configuration"
+                )
+            return compile_components(custom, self.log_config.components)
+
         formatters: Dict = {}
         default_settings = DefaultLoggingSettings()
 
         # Build file handlers — each level gets its own handler with the
         # appropriate rotation strategy.
         handlers: Dict = {}
-        for level, log_file in self.log_files.items():
+        for level, log_file in self._planned_log_files().items():
             handler_cfg = self._build_file_handler_config(log_file, level)
             handler_cfg.update(
                 {
@@ -309,7 +338,9 @@ class LogManager:
             fmt_type = self.log_config.log_file_format_types.get(level, "None").upper()
             if fmt_type in ALLOWED_FILE_FORMAT_TYPES:
                 formatter[level.lower()].update(
-                    {"()": f"fastapi_logging_kit.formatters.{fmt_type}Formatter"}
+                    {
+                        "()": f"fastapi_logging_kit.formatters.{fmt_type}Formatter",
+                    }
                 )
             formatters.update(formatter)
 
@@ -346,4 +377,56 @@ class LogManager:
             "disable_existing_loggers": False,
         }
 
-        logging.config.dictConfig(config)
+        return compile_components(config, self.log_config.components)
+
+    def set_conf(self, mode: str = "replace_root") -> None:
+        """Install handlers using the selected ownership policy.
+
+        ``additive`` is the safe automatic default: package-owned
+        file/email handlers are attached to root alongside existing
+        handlers, and all configured package handlers serve the
+        ``fastapi_logging_kit`` namespace. Root level, other root handlers
+        and application loggers are unchanged.
+
+        ``isolated`` routes only the ``fastapi_logging_kit`` namespace to
+        package handlers. ``replace_root`` preserves explicit legacy
+        dictConfig setup. Direct set_conf() callers retain their
+        historical root-replacement default for API compatibility.
+
+        """
+        if mode not in {"additive", "isolated", "replace_root"}:
+            raise ValueError("mode must be 'additive', 'isolated', or 'replace_root'")
+        config = self.build_logging_dict()
+        if mode == "replace_root":
+            logging.config.dictConfig(
+                {k: v for k, v in config.items() if not k.startswith("_dj_")}
+            )
+            forget_controlled_loggers()
+            if config.get("_fast_explicit_package_handlers"):
+                self._set_owned_conf(config, mode="isolated")
+        else:
+            if self.log_config.logging_config is not None and not self.log_config.components:
+                logging.config.dictConfig(config)
+            else:
+                self._set_owned_conf(config, mode=mode)
+
+    @staticmethod
+    def _resolve_class(path: str) -> Any:
+        module_name, _, class_name = path.rpartition(".")
+        if not module_name:
+            raise ValueError(f"Invalid import path: {path}")
+        try:
+            return getattr(importlib.import_module(module_name), class_name)
+        except (ImportError, AttributeError) as exc:
+            raise ImportError(f"Cannot resolve component {path!r}") from exc
+
+    @classmethod
+    def _set_isolated_conf(cls, config: Dict) -> None:
+        """Retained helper for scoped package-only logger initialization."""
+        cls._set_owned_conf(config, mode="isolated")
+
+    @classmethod
+    def _set_owned_conf(cls, config: Dict, *, mode: str) -> None:
+        """Apply the same compiled component graph in additive/isolated
+        modes."""
+        activate(config, mode=mode, resolver=cls._resolve_class)

@@ -18,6 +18,9 @@ which is what the CLI commands and non-web processes need.
 """
 
 import logging
+import logging.config
+from copy import deepcopy
+from threading import RLock
 from typing import Any, List, Mapping, Optional
 
 from fastapi_logging_kit.checks import Error, run_checks
@@ -60,6 +63,64 @@ def _report_errors(errors: List[Error]) -> None:
     )
 
 
+# The structured contract is separate from legacy flat-key configuration.
+# A per-application marker prevents duplicated ASGI middleware registration.
+_STRUCTURED_LOCK = RLock()
+
+
+def _setup_structured(app: Optional[Any], config: Mapping[str, Any], *, add_middleware: bool) -> None:
+    """Apply the approved v1 contract and add request middleware once."""
+    from fastapi_logging_kit.settings.contract import compile_settings
+    from fastapi_logging_kit.settings.components import compile_components
+    from fastapi_logging_kit.settings.activation import activate
+
+    compiled = compile_settings(config)
+    if not compiled["ENABLED"]:
+        return
+    with _STRUCTURED_LOCK:
+        if app is not None:
+            previous = getattr(app.state, "_fastapi_logging_kit_structured", None)
+            if previous is not None:
+                if previous != compiled:
+                    raise RuntimeError("FastAPI Logging was already configured with different settings")
+                return
+            if getattr(app, "middleware_stack", None) is not None:
+                raise RuntimeError("Configure FastAPI Logging before starting the ASGI application")
+        logging_conf = compiled["LOGGING"]
+        components = compiled["COMPONENTS"]
+        if logging_conf:
+            # Explicit LOGGING configuration opts in to the normal, process-wide
+            # dictConfig replacement semantics. Disable-existing defaults to False.
+            logging_conf.setdefault("disable_existing_loggers", False)
+            if components:
+                had_root = "root" in logging_conf
+                logging_conf = compile_components(logging_conf, components)
+                logging_conf = {k: v for k, v in logging_conf.items() if not k.startswith("_fast_")}
+                if not had_root and not components.get("root_handlers"):
+                    # A missing root section must not silently replace the host root.
+                    logging_conf.pop("root", None)
+            logging.config.dictConfig(logging_conf)
+        else:
+            # Without an explicit replacement, all owned handlers are attached
+            # additively by the existing transactional component activator.
+            preset = {
+                "version": 1,
+                "formatters": {"console": {"format": "%(levelname)s %(name)s: %(message)s"}},
+                "filters": {},
+                "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "console", "level": "INFO"}},
+                "loggers": {},
+                "root": {"handlers": []},
+            }
+            graph = compile_components(preset, components)
+            resolver = logging.config.DictConfigurator({"version": 1}).resolve
+            activate(graph, mode="additive", resolver=resolver)
+        if app is not None:
+            if add_middleware and compiled["REQUEST_LOGGING"]["ENABLED"]:
+                from fastapi_logging_kit.middleware import RequestLogMiddleware
+                app.add_middleware(RequestLogMiddleware, config=deepcopy(compiled["REQUEST_LOGGING"]))
+            app.state._fastapi_logging_kit_structured = compiled
+
+
 def setup_logging(
     app: Optional[Any] = None,
     config: Optional[Mapping[str, Any]] = None,
@@ -86,6 +147,17 @@ def setup_logging(
             configuration and warn about any problems.
 
     """
+    if config is None and not settings_manager.log_settings:
+        _setup_structured(app, {}, add_middleware=add_middleware)
+        return
+
+    if config is not None and (
+        "ENABLED" in config or "LOGGING" in config
+        or "COMPONENTS" in config or "REQUEST_LOGGING" in config
+    ):
+        _setup_structured(app, config, add_middleware=add_middleware)
+        return
+
     if config is not None:
         settings_manager.load(config)
 
