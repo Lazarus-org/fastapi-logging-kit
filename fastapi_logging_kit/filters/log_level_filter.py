@@ -12,7 +12,7 @@ class LoggingLevelFilter(logging.Filter):
 
     """
 
-    def __init__(self, logging_level: int):
+    def __init__(self, logging_level: int) -> None:
         """Initializes a LoggingLevelFilter instance.
 
         Args:
