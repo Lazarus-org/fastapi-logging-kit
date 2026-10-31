@@ -28,7 +28,7 @@ class TestBinding:
         manager.bind(request_id="abc")
 
         assert (
-            f"{ContextVarManager.FASTAPI_LOGGING_PREFIX}request_id"
+            f"{ContextVarManager.FASTAPI_LOGGING_KIT_PREFIX}request_id"
             in manager._context_vars  # pylint: disable=protected-access
         )
 
