@@ -70,7 +70,7 @@ class TestRequestLogMiddlewareBasics:
         asgi_caller: Callable[..., Any],
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """Test that query parameters and the referrer are logged."""
+        """Query values are omitted by default to avoid accidental secret exposure."""
         caplog.set_level(logging.INFO, logger=LOGGER_NAME)
 
         await asgi_caller(
@@ -81,8 +81,9 @@ class TestRequestLogMiddlewareBasics:
             ),
         )
 
-        assert "query_params={'page': '2'}" in caplog.text
-        assert "referrer=https://example.com/" in caplog.text
+        assert "page=2" not in caplog.text
+        assert "query_params=" not in caplog.text
+        assert "https://example.com/" not in caplog.text
 
     async def test_generates_request_id_when_header_absent(
         self,
@@ -412,3 +413,227 @@ class TestRequestLogMiddlewareSqlLogging:
             """Do nothing."""
 
         assert RequestLogMiddleware(app).log_sql is False
+
+
+async def test_chunked_request_body_is_forwarded_unchanged_and_captured_bounded(
+    scope_factory, asgi_caller, caplog
+):
+    """Request diagnostics observe ASGI chunks without changing app input."""
+    from fastapi_logging_kit.settings.contract import compile_settings
+
+    caplog.set_level(logging.INFO, logger=LOGGER_NAME)
+    received = bytearray()
+    body_chunks = [b'{"username":', b'"alice",', b'"password":"chunk-secret"}']
+
+    async def app(scope, receive, send):
+        while True:
+            message = await receive()
+            received.extend(message.get("body", b""))
+            if not message.get("more_body", False):
+                break
+        await _send_plain_response(send)
+
+    config = compile_settings({
+        "REQUEST_LOGGING": {
+            "REQUEST_BODY_ENABLED": True,
+            "MAX_BODY_BYTES": 128,
+        }
+    })["REQUEST_LOGGING"]
+    middleware = RequestLogMiddleware(app, config=config)
+    sent = await asgi_caller(
+        middleware,
+        scope_factory(
+            method="POST",
+            headers={"Content-Type": "application/json"},
+        ),
+        body_chunks=body_chunks,
+    )
+    assert bytes(received) == b"".join(body_chunks)
+    assert [message["type"] for message in sent] == [
+        "http.response.start", "http.response.body"
+    ]
+    assert '"username":"alice"' in caplog.text
+    assert "chunk-secret" not in caplog.text
+    assert "[REDACTED]" in caplog.text
+
+
+async def test_streaming_finish_is_not_logged_when_final_send_fails(
+    scope_factory, caplog
+):
+    """A failed final ASGI send must not be reported as a finished stream."""
+    from fastapi_logging_kit.settings.contract import compile_settings
+
+    caplog.set_level(logging.INFO, logger=LOGGER_NAME)
+
+    async def app(scope, receive, send):
+        await send({
+            "type": "http.response.start",
+            "status": 200,
+            "headers": [(b"content-type", b"text/plain")],
+        })
+        await send({"type": "http.response.body", "body": b"part", "more_body": True})
+        await send({"type": "http.response.body", "body": b"done", "more_body": False})
+
+    config = compile_settings(
+        {"REQUEST_LOGGING": {"LOG_STREAMING_EVENTS": True}}
+    )["REQUEST_LOGGING"]
+    middleware = RequestLogMiddleware(app, config=config)
+
+    async def receive():
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def failing_send(message):
+        if (
+            message["type"] == "http.response.body"
+            and not message.get("more_body", False)
+        ):
+            raise RuntimeError("downstream send failed")
+
+    with pytest.raises(RuntimeError, match="downstream send failed"):
+        await middleware(scope_factory(), receive, failing_send)
+
+    assert "Streaming started" in caplog.text
+    assert "Streaming failed" in caplog.text
+    assert "Streaming finished" not in caplog.text
+
+
+async def test_legacy_middleware_does_not_trust_forwarded_for_by_default(
+    scope_factory, asgi_caller
+):
+    captured = {}
+
+    async def app(scope, receive, send):
+        captured.update(manager.get_contextvars())
+        await _send_plain_response(send)
+
+    await asgi_caller(
+        RequestLogMiddleware(app),
+        scope_factory(
+            client=("192.0.2.10", 9000),
+            headers={"X-Forwarded-For": "203.0.113.50"},
+        ),
+    )
+    assert captured["ip_address"] == "192.0.2.10"
+
+
+def test_finalize_request_skips_expensive_diagnostics_when_info_is_disabled(
+    request_middleware, request_factory, caplog
+):
+    state = {
+        "status_code": 200,
+        "content_type": "application/json",
+        "chunks": 1,
+        "finalized": False,
+    }
+    with caplog.at_level(logging.WARNING, logger=LOGGER_NAME):
+        request_middleware._finalize_request(request_factory(), state, 0.0)
+    assert state["finalized"] is True
+    assert "REQUEST FINISHED" not in caplog.text
+
+
+
+class TestStructuredSQLDiagnostics:
+    """SQL request diagnostics exposed by the structured v1 configuration."""
+
+    async def test_structured_configuration_captures_queries(
+        self, scope_factory, asgi_caller, caplog
+    ):
+        caplog.set_level(logging.INFO, logger=LOGGER_NAME)
+
+        async def app(scope, receive, send):
+            record_query("SELECT * FROM accounts", 0.012)
+            await _send_plain_response(send)
+
+        middleware = RequestLogMiddleware(
+            app,
+            config={"LOG_SQL_QUERIES": True},
+        )
+        await asgi_caller(middleware, scope_factory())
+        assert "1 SQL QUERIES EXECUTED" in caplog.text
+        assert "SELECT * FROM accounts" in caplog.text
+
+    async def test_query_capture_is_bounded_by_count(
+        self, scope_factory, asgi_caller, caplog
+    ):
+        caplog.set_level(logging.INFO, logger=LOGGER_NAME)
+
+        async def app(scope, receive, send):
+            record_query("SELECT first", 0.01)
+            record_query("SELECT second", 0.02)
+            await _send_plain_response(send)
+
+        middleware = RequestLogMiddleware(
+            app,
+            config={"LOG_SQL_QUERIES": True, "MAX_SQL_QUERIES": 1},
+        )
+        await asgi_caller(middleware, scope_factory())
+        assert "1 SQL QUERIES EXECUTED" in caplog.text
+        assert "SELECT first" in caplog.text
+        assert "SELECT second" not in caplog.text
+        assert "SQL query capture truncated" in caplog.text
+
+    async def test_query_capture_is_bounded_by_bytes(
+        self, scope_factory, asgi_caller, caplog
+    ):
+        caplog.set_level(logging.INFO, logger=LOGGER_NAME)
+
+        async def app(scope, receive, send):
+            record_query("SELECT a very long query statement", 0.01)
+            await _send_plain_response(send)
+
+        middleware = RequestLogMiddleware(
+            app,
+            config={"LOG_SQL_QUERIES": True, "MAX_SQL_BYTES": 32},
+        )
+        await asgi_caller(middleware, scope_factory())
+        assert "<oversized SQL log>" in caplog.text
+        assert "SELECT a very long query statement" not in caplog.text
+
+    async def test_structured_sql_logging_is_disabled_by_default(
+        self, scope_factory, asgi_caller, caplog
+    ):
+        caplog.set_level(logging.INFO, logger=LOGGER_NAME)
+
+        async def app(scope, receive, send):
+            record_query("SELECT private_data", 0.01)
+            await _send_plain_response(send)
+
+        middleware = RequestLogMiddleware(app, config={})
+        await asgi_caller(middleware, scope_factory())
+        assert "SELECT private_data" not in caplog.text
+        assert "SQL QUERIES EXECUTED" not in caplog.text
+
+    async def test_streaming_events_are_opt_in_for_structured_config(
+        self, scope_factory, asgi_caller, caplog
+    ):
+        caplog.set_level(logging.INFO, logger=LOGGER_NAME)
+
+        async def app(scope, receive, send):
+            await send({
+                "type": "http.response.start",
+                "status": 200,
+                "headers": [(b"content-type", b"text/plain")],
+            })
+            await send({
+                "type": "http.response.body",
+                "body": b"one",
+                "more_body": True,
+            })
+            await send({
+                "type": "http.response.body",
+                "body": b"two",
+                "more_body": False,
+            })
+
+        middleware = RequestLogMiddleware(app, config={})
+        await asgi_caller(middleware, scope_factory())
+        assert "Streaming started" not in caplog.text
+        assert "Streaming finished" not in caplog.text
+
+        caplog.clear()
+        middleware = RequestLogMiddleware(
+            app, config={"LOG_STREAMING_EVENTS": True}
+        )
+        await asgi_caller(middleware, scope_factory())
+        assert "Streaming started" in caplog.text
+        assert "Streaming finished" in caplog.text
