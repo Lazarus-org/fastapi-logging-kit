@@ -1,4 +1,6 @@
 import sys
+import tomllib
+from pathlib import Path
 
 import pytest
 
@@ -53,3 +55,51 @@ class TestPublicApi:
         from fastapi_logging_kit.app import setup_logging
 
         assert fastapi_logging_kit.setup_logging is setup_logging
+
+    def test_distribution_name_and_cli_entry_point_match_public_identity(self) -> None:
+        """Test that distribution and CLI metadata use the selected package name."""
+        project_root = Path(__file__).resolve().parents[2]
+        metadata = tomllib.loads((project_root / "pyproject.toml").read_text())
+
+        assert metadata["project"]["name"] == "fastapi-logging-kit"
+        assert metadata["project"]["scripts"] == {
+            "fastapi-logging-kit": "fastapi_logging_kit.commands.cli:main"
+        }
+
+    def test_package_version_matches_distribution_metadata(self) -> None:
+        """Test that the runtime version matches the PEP 621 project version."""
+        project_root = Path(__file__).resolve().parents[2]
+        metadata = tomllib.loads((project_root / "pyproject.toml").read_text())
+
+        assert fastapi_logging_kit.__version__ == metadata["project"]["version"]
+
+    def test_package_declares_pep_561_typing_support(self) -> None:
+        """Test that the PEP 561 marker ships with the source package."""
+        package_root = Path(fastapi_logging_kit.__file__).resolve().parent
+
+        assert (package_root / "py.typed").is_file()
+
+    def test_runtime_requirements_match_pep_621_metadata(self) -> None:
+        """Test that the runtime requirements mirror distribution metadata."""
+        project_root = Path(__file__).resolve().parents[2]
+        metadata = tomllib.loads((project_root / "pyproject.toml").read_text())
+        requirements = [
+            line.strip()
+            for line in (project_root / "packages/requirements.txt").read_text().splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+
+        assert requirements == metadata["project"]["dependencies"]
+
+    def test_supported_python_range_matches_the_approved_matrix(self) -> None:
+        """Test that metadata does not claim untested Python releases."""
+        project_root = Path(__file__).resolve().parents[2]
+        metadata = tomllib.loads((project_root / "pyproject.toml").read_text())
+        classifiers = set(metadata["project"]["classifiers"])
+
+        assert metadata["project"]["requires-python"] == ">=3.11,<3.16"
+        assert {
+            f"Programming Language :: Python :: 3.{minor}"
+            for minor in range(11, 16)
+        }.issubset(classifiers)
+        assert "Programming Language :: Python :: 3.10" not in classifiers
