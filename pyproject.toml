@@ -279,6 +279,10 @@ report.exclude_lines = [
 [tool.commitizen]
 name = "cz_conventional_commits"
 version = "1.0.0"
+version_files = [
+  "fastapi_logging_kit/__init__.py:__version__",
+  "pyproject.toml:^version =",
+]
 tag_format = "v$version"
 settings.increment_types = [ "feat", "fix" ]
 
