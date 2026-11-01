@@ -4,6 +4,10 @@ All notable changes to FastAPI Logging Kit are documented here.
 
 ## Unreleased
 
+### Fixed
+
+- Fix tox bootstrap requirement parsing so compatibility environments can start.
+
 ## 1.0.0 - 2026-11-01
 
 First release of FastAPI Logging Kit.
