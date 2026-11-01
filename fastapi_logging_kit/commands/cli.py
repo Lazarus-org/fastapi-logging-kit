@@ -14,7 +14,6 @@ a Typer application, installed as the ``fastapi-logging-kit`` console script::
 Each command reads the same configuration the application does, so
 ``FASTAPI_LOGGING_``-prefixed environment variables (notably
 ``FASTAPI_LOGGING_LOG_DIR``) apply to the CLI too.
-
 """
 
 from typing import Optional
@@ -22,8 +21,12 @@ from typing import Optional
 import typer
 
 from fastapi_logging_kit.commands import archive_logs as archive_logs_command
-from fastapi_logging_kit.commands import generate_pretty_json as generate_pretty_json_command
-from fastapi_logging_kit.commands import generate_pretty_xml as generate_pretty_xml_command
+from fastapi_logging_kit.commands import (
+    generate_pretty_json as generate_pretty_json_command,
+)
+from fastapi_logging_kit.commands import (
+    generate_pretty_xml as generate_pretty_xml_command,
+)
 from fastapi_logging_kit.commands import logs_size_audit as logs_size_audit_command
 from fastapi_logging_kit.commands import rotate_logs as rotate_logs_command
 from fastapi_logging_kit.commands import send_logs as send_logs_command

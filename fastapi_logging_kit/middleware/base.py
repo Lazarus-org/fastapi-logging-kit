@@ -15,7 +15,6 @@ class BaseMiddleware:
 
     Attributes:
         app (ASGIApp): The next application in the middleware stack.
-
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -23,7 +22,6 @@ class BaseMiddleware:
 
         Args:
             app (ASGIApp): The next ASGI application to call.
-
         """
         self.app = app
 
@@ -42,7 +40,6 @@ class BaseMiddleware:
             scope (Scope): The ASGI connection scope.
             receive (Receive): The ASGI receive channel.
             send (Send): The ASGI send channel.
-
         """
         if scope["type"] != "http":
             await self.app(scope, receive, send)
@@ -60,7 +57,6 @@ class BaseMiddleware:
 
         Raises:
             NotImplementedError: Always, unless overridden by a subclass.
-
         """
         raise NotImplementedError("dispatch must be implemented by subclass")
 
@@ -74,7 +70,6 @@ def get_header(message: MutableMapping[str, Any], name: str) -> str:
 
     Returns:
         str: The decoded header value, or ``"Unknown"`` when absent.
-
     """
     target = name.lower().encode("latin-1")
     for key, value in message.get("headers") or []:

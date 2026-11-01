@@ -7,8 +7,8 @@ from email.mime.text import MIMEText
 from smtplib import SMTP
 from typing import List, Optional
 
-from fastapi_logging_kit.utils.get_conf import get_email_setting
 from fastapi_logging_kit.settings import settings_manager
+from fastapi_logging_kit.utils.get_conf import get_email_setting
 
 logger = logging.getLogger(__name__)
 
@@ -23,20 +23,26 @@ _limiter: threading.BoundedSemaphore | None = None
 
 def _options() -> tuple[int, int]:
     """Load resource bounds independently of the external settings module."""
+    # pylint: disable=unidiomatic-typecheck
     values = settings_manager.email_notifier
     if not isinstance(values, dict):
         values = {}
     concurrent = values.get("MAX_CONCURRENT", _MAX_CONCURRENT_DEFAULT)
     timeout = values.get("SMTP_TIMEOUT", _TIMEOUT_DEFAULT)
     if type(concurrent) is not int or not 1 <= concurrent <= 64:
-        raise ValueError("LOG_EMAIL_NOTIFIER.MAX_CONCURRENT must be an integer from 1 to 64")
+        raise ValueError(
+            "LOG_EMAIL_NOTIFIER.MAX_CONCURRENT must be an integer from 1 to 64"
+        )
     if type(timeout) is not int or not 1 <= timeout <= 120:
-        raise ValueError("LOG_EMAIL_NOTIFIER.SMTP_TIMEOUT must be an integer from 1 to 120")
+        raise ValueError(
+            "LOG_EMAIL_NOTIFIER.SMTP_TIMEOUT must be an integer from 1 to 120"
+        )
     return concurrent, timeout
 
 
 def _semaphore(capacity: int) -> threading.BoundedSemaphore:
     """Return a per-process capacity semaphore, reset when settings change."""
+    # pylint: disable=global-statement
     global _limiter, _limiter_pid, _limiter_capacity
     with _limiter_lock:
         pid = os.getpid()
@@ -49,6 +55,7 @@ def _semaphore(capacity: int) -> threading.BoundedSemaphore:
 
 def _after_fork() -> None:
     """Discard lock/semaphore inherited from a prefork server."""
+    # pylint: disable=global-statement
     global _limiter_lock, _limiter, _limiter_pid, _limiter_capacity
     _limiter_lock = threading.Lock()
     _limiter = None
@@ -66,7 +73,6 @@ def _deliver(msg: MIMEMultipart, recipient_list: List[str]) -> None:
     Args:
         msg (MIMEMultipart): The message to send.
         recipient_list (List[str]): The addresses to deliver to.
-
     """
     server = SMTP(
         get_email_setting("EMAIL_HOST"),
@@ -106,7 +112,6 @@ def send_email_with_attachment(
 
     Raises:
         Exception: Any error raised while connecting or sending.
-
     """
     msg = MIMEMultipart()
     msg["From"] = get_email_setting("DEFAULT_FROM_EMAIL")
@@ -139,7 +144,8 @@ def send_email_async(
     """
     capacity, _timeout = _options()
     slot = _semaphore(capacity)
-    if not slot.acquire(blocking=False):
+    # A nonblocking acquire drops saturated notifications instead of waiting.
+    if not slot.acquire(blocking=False):  # pylint: disable=consider-using-with
         logger.warning("Email notifier at capacity; dropping notification")
         if event is not None:
             event.set()
@@ -155,7 +161,7 @@ def send_email_async(
             msg.attach(MIMEText(body, "html"))
             _deliver(msg, recipient_list)
             logger.info("The Record has been sent to ADMIN EMAIL successfully.")
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning("Email Notifier failed to send the Record: %s", exc)
         finally:
             slot.release()

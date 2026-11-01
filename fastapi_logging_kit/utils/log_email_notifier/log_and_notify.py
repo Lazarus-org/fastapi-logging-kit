@@ -29,7 +29,6 @@ def log_and_notify_admin(
         ValueError: If the email notifier is disabled, if the record
             cannot be created from the supplied parameters, or if
             ADMIN_EMAIL is not configured.
-
     """
     # Get the caller's frame to capture the correct module, file, and line number
     frame = inspect.currentframe().f_back  # type: ignore

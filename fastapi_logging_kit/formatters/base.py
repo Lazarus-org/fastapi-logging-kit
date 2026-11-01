@@ -9,9 +9,11 @@ import sys
 import traceback
 from collections.abc import Mapping
 from logging import Formatter, LogRecord
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 
-from fastapi_logging_kit.constants.structured_validation import resolve_structured_logging
+from fastapi_logging_kit.constants.structured_validation import (
+    resolve_structured_logging,
+)
 
 # Only explicitly named structured values can be reliably redacted. Free-form
 # messages and exception text may contain secrets and require caller discipline.
@@ -56,11 +58,9 @@ _STANDARD_RECORD_FIELDS = frozenset(logging.makeLogRecord({}).__dict__) | {
 class BaseStructuredFormatter(Formatter):
     """Formatter base compatible with existing ``fmt``/``datefmt`` arguments.
 
-    ``structured_logging`` is optional and can be passed by dictConfig.
-    The serializer applies node and conservative output-byte budgets
-    while walking values, before building large nested containers or
-    invoking a serializer.
-
+    ``structured_logging`` is optional and can be passed by dictConfig. The serializer
+    applies node and conservative output-byte budgets while walking values, before
+    building large nested containers or invoking a serializer.
     """
 
     def __init__(
@@ -113,11 +113,9 @@ class BaseStructuredFormatter(Formatter):
     def _new_budget(self, *, message: bool = False) -> list[int]:
         """Return ``[remaining_nodes, remaining_escaped_bytes]``.
 
-        Node count is capped independently of user settings, and also
-        scales down for small event limits. Text is charged at six
-        output bytes per UTF-8 byte to leave room for JSON/XML escaping
-        and structural overhead.
-
+        Node count is capped independently of user settings, and also scales down for
+        small event limits. Text is charged at six output bytes per UTF-8 byte to leave
+        room for JSON/XML escaping and structural overhead.
         """
         max_event_bytes = self.options["MAX_EVENT_BYTES"]
         configured_nodes = self.options["MAX_ITEMS"] * self.options["MAX_DEPTH"]
@@ -185,10 +183,8 @@ class BaseStructuredFormatter(Formatter):
     ) -> Any:
         """Return a safe JSON/XML-compatible value within a shared budget.
 
-        ``budget`` retains support for the old private one-element list
-        form; a byte budget is appended when a caller supplies that
-        form.
-
+        ``budget`` retains support for the old private one-element list form; a byte
+        budget is appended when a caller supplies that form.
         """
         # Keep the bounded type dispatcher together on the serialization hot path.
         # pylint: disable=too-many-return-statements,too-many-branches
@@ -376,8 +372,8 @@ class BaseStructuredFormatter(Formatter):
         if budget[0] <= 0 or budget[1] < _TEXT_EXPANSION_FACTOR:
             return _OMITTED
         exception = traceback.TracebackException(
-            record.exc_info[0],
-            record.exc_info[1],
+            cast(type[BaseException], record.exc_info[0]),
+            cast(BaseException, record.exc_info[1]),
             record.exc_info[2],
             limit=self.options["MAX_EXCEPTION_FRAMES"],
             capture_locals=False,

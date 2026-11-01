@@ -16,7 +16,6 @@ class ContextVarFilter(Filter):
     Methods:
         filter(record: LogRecord) -> bool:
             Merges context variables into the log record before formatting.
-
     """
 
     def filter(self, record: LogRecord) -> bool:
@@ -30,7 +29,6 @@ class ContextVarFilter(Filter):
 
         This method checks if the log record already has a 'context' attribute. It then merges
         the current context variables (retrieved via `contextvar.get_merged_context`) into the log record.
-
         """
         bound_logger_context: Dict[str, Any] = getattr(record, "context", {})
 

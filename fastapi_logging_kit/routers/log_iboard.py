@@ -1,15 +1,13 @@
 """The LogiBoard router.
 
-``django_logging`` exposed LogiBoard as a ``TemplateView`` wired up in
-``urls.py`` and restricted to superusers. The FastAPI equivalent is an
-``APIRouter`` plus a ``StaticFiles`` mount for the packaged assets.
+``django_logging`` exposed LogiBoard as a ``TemplateView`` wired up in ``urls.py`` and
+restricted to superusers. The FastAPI equivalent is an ``APIRouter`` plus a
+``StaticFiles`` mount for the packaged assets.
 
-FastAPI has no built-in auth, so access control is a replaceable
-predicate: :func:`set_permission_check` installs your own callable. The
-default reads ``is_superuser`` off ``scope["user"]`` and denies access
-when no user is present, matching how Django's ``AnonymousUser`` would
-fail the same check.
-
+FastAPI has no built-in auth, so access control is a replaceable predicate:
+:func:`set_permission_check` installs your own callable. The default reads
+``is_superuser`` off ``scope["user"]`` and denies access when no user is present,
+matching how Django's ``AnonymousUser`` would fail the same check.
 """
 
 import inspect
@@ -20,7 +18,11 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from starlette.staticfiles import StaticFiles
 
-from fastapi_logging_kit.templating import STATIC_DIR, STATIC_URL_PREFIX, render_to_string
+from fastapi_logging_kit.templating import (
+    STATIC_DIR,
+    STATIC_URL_PREFIX,
+    render_to_string,
+)
 
 PermissionCheck = Callable[[Request], bool]
 
@@ -35,7 +37,6 @@ def default_permission_check(request: Request) -> bool:
 
     Returns:
         bool: True when the request carries a superuser, else False.
-
     """
     user = request.scope.get("user")
     if user is None:
@@ -53,11 +54,10 @@ def set_permission_check(
 ) -> None:
     """Set a process-wide or application-scoped LogiBoard permission predicate.
 
-    The callback must be synchronous and return a real ``bool``; invalid or
-    awaitable results fail closed. Passing ``app`` isolates the policy to that
-    FastAPI application. Without it, the process-wide default is updated.
-    Passing ``None`` restores the default predicate (or the process-wide policy
-    for an app override).
+    The callback must be synchronous and return a real ``bool``; invalid or awaitable
+    results fail closed. Passing ``app`` isolates the policy to that FastAPI
+    application. Without it, the process-wide default is updated. Passing ``None``
+    restores the default predicate (or the process-wide policy for an app override).
     """
     if check is not None and not callable(check):
         raise TypeError("permission check must be callable or None")
@@ -109,7 +109,6 @@ async def log_iboard(request: Request) -> HTMLResponse:
 
     Returns:
         HTMLResponse: The rendered LogiBoard page, or a 403 error page.
-
     """
     if _permission_is_allowed(request):
         return HTMLResponse(render_to_string("log_iboard.html"))
@@ -129,9 +128,9 @@ async def log_iboard(request: Request) -> HTMLResponse:
 def mount_static(app: Any) -> None:
     """Mount the packaged LogiBoard assets once on *app*.
 
-    Repeated setup calls are harmless. An application-owned route already
-    occupying the package's static URL is treated as a configuration conflict
-    rather than silently shadowed.
+    Repeated setup calls are harmless. An application-owned route already occupying the
+    package's static URL is treated as a configuration conflict rather than silently
+    shadowed.
     """
     routes = getattr(app, "routes", ())
     for route in routes:

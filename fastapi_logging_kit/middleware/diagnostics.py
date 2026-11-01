@@ -50,9 +50,7 @@ def _normalize_key(value: str) -> str:
 
 def is_sensitive_field(key: str, excluded_fields: Sequence[str]) -> bool:
     """Return whether a field name should be redacted in request diagnostics."""
-    normalized_exclusions = frozenset(
-        _normalize_key(name) for name in excluded_fields
-    )
+    normalized_exclusions = frozenset(_normalize_key(name) for name in excluded_fields)
     return _is_sensitive(key, normalized_exclusions)
 
 
@@ -86,9 +84,7 @@ def sanitize_user_agent(value: str, *, max_length: int = 180) -> str:
     product_pattern = re.compile(
         r"(?<![A-Za-z0-9])([A-Za-z][A-Za-z0-9_.-]{0,31}/[0-9][A-Za-z0-9_.-]{0,31})"
     )
-    products = product_pattern.findall(
-        control_pattern.sub(" ", str(value))[:2048]
-    )
+    products = product_pattern.findall(control_pattern.sub(" ", str(value))[:2048])
     return (" ".join(products[:6]) or "Unknown User Agent")[:max_length]
 
 
@@ -101,6 +97,7 @@ def _sanitize_json_value(
     budget: list[int],
 ) -> Any:
     """Sanitize decoded JSON without traversing unbounded structures."""
+    # pylint: disable=too-many-return-statements
     if budget[0] <= 0:
         return _OMITTED
     budget[0] -= 1
@@ -130,12 +127,12 @@ def _sanitize_json_value(
     if isinstance(value, list):
         if depth > max_depth:
             return _OMITTED
-        result = []
+        list_result = []
         for child in value:
             if budget[0] <= 0:
-                result.append(_OMITTED)
+                list_result.append(_OMITTED)
                 break
-            result.append(
+            list_result.append(
                 _sanitize_json_value(
                     child,
                     excluded_fields=excluded_fields,
@@ -144,7 +141,7 @@ def _sanitize_json_value(
                     budget=budget,
                 )
             )
-        return result
+        return list_result
 
     if isinstance(value, str):
         return value[:_MAX_STRING_LENGTH]
@@ -163,8 +160,8 @@ def format_json_diagnostic(
 ) -> Optional[str]:
     """Return redacted JSON text or a safe marker; never return raw body text.
 
-    Only ``application/json`` and ``+json`` media types are accepted. Callers
-    must enforce the byte limit while streaming the ASGI message body.
+    Only ``application/json`` and ``+json`` media types are accepted. Callers must
+    enforce the byte limit while streaming the ASGI message body.
     """
     if not body:
         return None

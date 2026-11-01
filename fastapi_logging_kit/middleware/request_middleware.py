@@ -4,7 +4,7 @@ import json
 import logging
 from contextlib import nullcontext
 from time import perf_counter
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, TypedDict, cast
 from urllib.parse import parse_qsl
 from uuid import uuid4
 
@@ -37,22 +37,37 @@ from fastapi_logging_kit.utils.time import format_elapsed_time
 logger = logging.getLogger(__name__)
 
 
+class _RequestState(TypedDict):
+    status_code: int
+    content_type: str
+    chunks: int
+    streaming: bool
+    finalized: bool
+    cancelled: bool
+    request_body: bytearray
+    request_body_oversized: bool
+    request_body_complete: bool
+    error_body: bytearray
+    error_body_oversized: bool
+
+
 class RequestLogMiddleware(BaseMiddleware):
     """Middleware to log information about each incoming request.
 
     Every request is assigned a request ID, which — together with the
     client IP and user agent — is bound to the context variables so that
-    every log record emitted while handling the request carries it.
+    a handler using ContextVarFilter can include it in log output.
 
-    Streaming responses are logged separately: a "Streaming started"
-    record is emitted when the first body chunk is sent and a
-    "Streaming finished" record once the response completes.
+    Context remains active until the final response chunk. Additional streaming
+    lifecycle records are opt-in for structured configuration and enabled by
+    default for direct legacy middleware.
 
     Attributes:
         app (ASGIApp): The next application in the middleware stack.
         log_sql (bool): Whether SQL queries should be reported per request.
-
     """
+
+    # pylint: disable=too-many-instance-attributes
 
     def __init__(
         self,
@@ -63,7 +78,6 @@ class RequestLogMiddleware(BaseMiddleware):
 
         Args:
             app (ASGIApp): The next ASGI application to call.
-
         """
         super().__init__(app)
         if config is None:
@@ -74,9 +88,9 @@ class RequestLogMiddleware(BaseMiddleware):
             # callers may supply only the options they want to override.
             from fastapi_logging_kit.settings.contract import compile_settings
 
-            self.configuration = compile_settings(
-                {"REQUEST_LOGGING": config}
-            )["REQUEST_LOGGING"]
+            self.configuration = compile_settings({"REQUEST_LOGGING": config})[
+                "REQUEST_LOGGING"
+            ]
             request_config = self.configuration
 
         self.log_sql = (
@@ -84,9 +98,7 @@ class RequestLogMiddleware(BaseMiddleware):
             if config is None
             else bool(request_config["LOG_SQL_QUERIES"])
         )
-        self.max_sql_bytes = (
-            4096 if config is None else request_config["MAX_SQL_BYTES"]
-        )
+        self.max_sql_bytes = 4096 if config is None else request_config["MAX_SQL_BYTES"]
         self.max_sql_queries = (
             100 if config is None else request_config["MAX_SQL_QUERIES"]
         )
@@ -119,6 +131,7 @@ class RequestLogMiddleware(BaseMiddleware):
 
     async def dispatch(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Log one HTTP request while isolating all state to its ASGI task."""
+        # pylint: disable=too-many-statements,too-many-boolean-expressions
         path = scope.get("path", "")
         if path in self.excluded_paths or any(
             path == prefix or path.startswith(prefix + "/")
@@ -140,7 +153,7 @@ class RequestLogMiddleware(BaseMiddleware):
             ),
         }
 
-        state: Dict[str, object] = {
+        state: _RequestState = {
             "status_code": 0,
             "content_type": "Unknown",
             "chunks": 0,
@@ -188,7 +201,8 @@ class RequestLogMiddleware(BaseMiddleware):
                     header = self.response_id_header.lower().encode("ascii")
                     message = dict(message)
                     message["headers"] = [
-                        (key, value) for key, value in message.get("headers", [])
+                        (key, value)
+                        for key, value in message.get("headers", [])
                         if key.lower() != header
                     ] + [(header, request_id.encode("ascii"))]
                 state["status_code"] = message["status"]
@@ -261,7 +275,9 @@ class RequestLogMiddleware(BaseMiddleware):
                     else:
                         logger.exception(
                             "REQUEST FAILED: method=%s path=%s request_id=%s",
-                            request.method, safe_path(request.url.path), request_id,
+                            request.method,
+                            safe_path(request.url.path),
+                            request_id,
                         )
                 if self.log_finished:
                     self._finalize_request(request, state, start_time)
@@ -290,24 +306,23 @@ class RequestLogMiddleware(BaseMiddleware):
             and 0 < len(requested_id) <= max_length
             and all(char.isalnum() or char in "-_." for char in requested_id)
         )
-        request_id = requested_id if valid else str(uuid4())
+        request_id = cast(str, requested_id) if valid else str(uuid4())
         request.scope.setdefault("state", {})["request_id"] = request_id
         return request_id
 
     def _finalize_request(
         self,
         request: Request,
-        state: Dict[str, object],
+        state: _RequestState,
         start_time: float,
     ) -> None:
-        """Finalizes the request by logging the response details and the time
-        taken to process the request.
+        """Finalizes the request by logging the response details and the time taken to
+        process the request.
 
         Args:
             request (Request): The incoming request.
             state (Dict[str, object]): The captured response metadata.
             start_time (float): The time when the request started.
-
         """
         if state["finalized"]:
             return
@@ -347,11 +362,11 @@ class RequestLogMiddleware(BaseMiddleware):
             body_diagnostics,
         )
 
-    def _body_diagnostics(self, request: Request, state: Dict[str, object]) -> str:
+    def _body_diagnostics(self, request: Request, state: _RequestState) -> str:
         """Return opt-in, bounded JSON request/error-body diagnostics.
 
-        Only JSON media types are decoded. Unsupported media types and invalid
-        JSON are represented by markers; raw bytes are never logged.
+        Only JSON media types are decoded. Unsupported media types and invalid JSON are
+        represented by markers; raw bytes are never logged.
         """
         config = self.configuration
         if config is None:
@@ -361,10 +376,12 @@ class RequestLogMiddleware(BaseMiddleware):
         excluded.extend(config["EXCLUDED_FIELDS_BY_PATH"].get(path, ()))
         depth = config["MAX_DIAGNOSTIC_DEPTH"]
         parts: List[str] = []
+        value: Optional[str]
 
-        if (
-            config["REQUEST_BODY_ENABLED"]
-            and request.method in ("POST", "PUT", "PATCH")
+        if config["REQUEST_BODY_ENABLED"] and request.method in (
+            "POST",
+            "PUT",
+            "PATCH",
         ):
             if not is_json_content_type(request.headers.get("content-type", "")):
                 value = "<unsupported content type>"
@@ -423,12 +440,10 @@ class RequestLogMiddleware(BaseMiddleware):
                 keep_blank_values=True,
                 max_num_fields=128,
             )
-            result: Dict[str, object] = {}
+            result: Dict[str, Any] = {}
             for key, value in pairs:
                 safe = (
-                    "[REDACTED]"
-                    if is_sensitive_field(key, list(exclusions))
-                    else value
+                    "[REDACTED]" if is_sensitive_field(key, list(exclusions)) else value
                 )
                 safe_key = key[:128]
                 if safe_key not in result:
@@ -446,6 +461,7 @@ class RequestLogMiddleware(BaseMiddleware):
 
     def _client_ip(self, request: Request) -> str:
         """Trust forwarded addresses only when the immediate peer is trusted."""
+        # pylint: disable=too-many-return-statements
         if self.configuration is None:
             # Direct middleware use falls back to the peer address; structured
             # setup can trust forwarding headers only through explicit proxies.
@@ -482,8 +498,8 @@ class RequestLogMiddleware(BaseMiddleware):
     ) -> Optional[str]:
         """Format captured SQL queries without exceeding the configured limit.
 
-        SQL text can contain credentials and personal data. This method is
-        reached only when SQL diagnostics are explicitly enabled.
+        SQL text can contain credentials and personal data. This method is reached only
+        when SQL diagnostics are explicitly enabled.
         """
         queries = get_queries() if test_queries is None else test_queries
         if not queries and not truncated:

@@ -1,15 +1,13 @@
 """A minimal cache used to throttle periodic maintenance work.
 
-``MonitorLogSizeMiddleware`` needs to remember when the log size audit
-last ran. In ``django_logging`` that state lived in ``django.core.cache``;
-FastAPI has no cache framework, so this module provides a small
-in-process store with the same ``get``/``set`` interface.
+``MonitorLogSizeMiddleware`` needs to remember when the log size audit last ran. In
+``django_logging`` that state lived in ``django.core.cache``; FastAPI has no cache
+framework, so this module provides a small in-process store with the same
+``get``/``set`` interface.
 
-The default backend is per-process, which is enough for the weekly audit
-it guards. Applications running several workers can swap in a shared
-backend — anything exposing ``get(key)`` and ``set(key, value,
-timeout=None)`` — via :func:`set_cache`.
-
+The default backend is per-process, which is enough for the weekly audit it guards.
+Applications running several workers can swap in a shared backend — anything exposing
+``get(key)`` and ``set(key, value, timeout=None)`` — via :func:`set_cache`.
 """
 
 import threading
@@ -34,7 +32,6 @@ class LocalMemoryCache:
 
         Returns:
             Any: The cached value, or ``default``.
-
         """
         with self._lock:
             entry = self._store.get(key)
@@ -56,7 +53,6 @@ class LocalMemoryCache:
             value (Any): The value to store.
             timeout (Optional[float]): Seconds until the entry expires.
                 ``None`` means it never expires.
-
         """
         expires_at = time.time() + timeout if timeout is not None else None
         with self._lock:
@@ -67,7 +63,6 @@ class LocalMemoryCache:
 
         Args:
             key (str): The cache key.
-
         """
         with self._lock:
             self._store.pop(key, None)
@@ -87,7 +82,6 @@ def set_cache(backend: Any) -> None:
     Args:
         backend (Any): Any object exposing ``get(key, default)`` and
             ``set(key, value, timeout)``.
-
     """
     global cache  # pylint: disable=global-statement
     cache = backend

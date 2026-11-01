@@ -14,7 +14,6 @@ def setup_directories(log_dir: str, sub_dir: str) -> Tuple[str, str]:
 
     Raises:
         FileNotFoundError: If the log directory or subdirectory does not exist.
-
     """
     if not os.path.exists(log_dir):
         raise FileNotFoundError(f"Directory {log_dir} does not exist.")
@@ -41,7 +40,6 @@ def process_files(
 
     Yields:
         Generator[Tuple[str, str], None, None]: Yields tuples of file paths and filenames for each processed file.
-
     """
     for filename in os.listdir(directory):
         if filename.endswith(file_extension):

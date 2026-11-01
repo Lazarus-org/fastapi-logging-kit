@@ -3,7 +3,10 @@ from logging import Handler, LogRecord
 from typing import Any, Optional
 
 from fastapi_logging_kit.templating import render_to_string
-from fastapi_logging_kit.utils.get_conf import get_email_setting, use_email_notifier_template
+from fastapi_logging_kit.utils.get_conf import (
+    get_email_setting,
+    use_email_notifier_template,
+)
 from fastapi_logging_kit.utils.log_email_notifier.notifier import send_email_async
 from fastapi_logging_kit.utils.request import get_ip_address, get_user_agent
 
@@ -42,7 +45,6 @@ class EmailHandler(Handler):
         Raises:
         ------
             Exception: If any error occurs while sending the email or formatting the log record.
-
         """
         try:
             request = getattr(record, "request", None)
@@ -82,7 +84,6 @@ class EmailHandler(Handler):
         Returns:
         -------
             str: The rendered email body as a string.
-
         """
         # Fetch IP address and user agent using the request helpers
         ip_address = get_ip_address(request) if request is not None else "Unknown"

@@ -1,9 +1,9 @@
 """Public v1 configuration contract, independent of the host settings library.
 
-Legacy flat keys remain supported by the legacy integration path. Structured
-request-middleware settings are copied into each application. Python's logging
-registry and logger/handler graph remain process-wide, as defined by stdlib
-logging; this contract does not create isolated logging registries per app.
+Legacy flat keys remain supported by the legacy integration path. Structured request-
+middleware settings are copied into each application. Python's logging registry and
+logger/handler graph remain process-wide, as defined by stdlib logging; this contract
+does not create isolated logging registries per app.
 """
 
 from collections.abc import Mapping
@@ -63,9 +63,10 @@ def _string_sequence(value: Any, field: str) -> list[str]:
 def compile_settings(config: Mapping[str, Any]) -> dict[str, Any]:
     """Normalize an explicit configuration without changing global loggers.
 
-    Invalid settings fail before middleware or handlers are installed.
-    No environment module is imported; developers own settings discovery.
+    Invalid settings fail before middleware or handlers are installed. No environment
+    module is imported; developers own settings discovery.
     """
+    # pylint: disable=too-many-branches,too-many-statements,unidiomatic-typecheck
     if not isinstance(config, Mapping):
         raise ComponentConfigurationError("FASTAPI_LOGGING must be a mapping")
     if any(not isinstance(key, str) for key in config):
@@ -103,9 +104,15 @@ def compile_settings(config: Mapping[str, Any]) -> dict[str, Any]:
     request = deepcopy(REQUEST_DEFAULTS)
     request.update(deepcopy(dict(supplied_request)))
     boolean_fields = (
-        "ENABLED", "LOG_REQUEST_STARTED", "LOG_REQUEST_FINISHED",
-        "LOG_EXCEPTIONS", "LOG_STREAMING_EVENTS", "LOG_SQL_QUERIES",
-        "USER_AGENT_ENABLED", "QUERY_PARAMS_ENABLED", "REQUEST_BODY_ENABLED",
+        "ENABLED",
+        "LOG_REQUEST_STARTED",
+        "LOG_REQUEST_FINISHED",
+        "LOG_EXCEPTIONS",
+        "LOG_STREAMING_EVENTS",
+        "LOG_SQL_QUERIES",
+        "USER_AGENT_ENABLED",
+        "QUERY_PARAMS_ENABLED",
+        "REQUEST_BODY_ENABLED",
         "ERROR_RESPONSE_BODY_ENABLED",
     )
     for name in boolean_fields:
@@ -113,15 +120,21 @@ def compile_settings(config: Mapping[str, Any]) -> dict[str, Any]:
             raise ComponentConfigurationError(f"REQUEST_LOGGING.{name} must be boolean")
     for name in ("REQUEST_ID_HEADER", "RESPONSE_ID_HEADER"):
         value = request[name]
-        if not isinstance(value, str) or not value or not value.isascii() or any(
-            not (char.isalnum() or char == "-") for char in value
+        if (
+            not isinstance(value, str)
+            or not value
+            or not value.isascii()
+            or any(not (char.isalnum() or char == "-") for char in value)
         ):
             raise ComponentConfigurationError(
                 f"REQUEST_LOGGING.{name} must be an HTTP header name"
             )
     for name in (
-        "MAX_QUERY_BYTES", "MAX_BODY_BYTES", "MAX_ERROR_RESPONSE_BYTES",
-        "MAX_SQL_BYTES", "MAX_DIAGNOSTIC_DEPTH",
+        "MAX_QUERY_BYTES",
+        "MAX_BODY_BYTES",
+        "MAX_ERROR_RESPONSE_BYTES",
+        "MAX_SQL_BYTES",
+        "MAX_DIAGNOSTIC_DEPTH",
     ):
         minimum = 1 if name.endswith("DEPTH") else 0
         if name.endswith("DEPTH"):
@@ -159,6 +172,7 @@ def compile_settings(config: Mapping[str, Any]) -> dict[str, Any]:
     for proxy in request["TRUSTED_PROXIES"]:
         try:
             import ipaddress
+
             ipaddress.ip_network(proxy, strict=False)
         except ValueError as exc:
             raise ComponentConfigurationError(

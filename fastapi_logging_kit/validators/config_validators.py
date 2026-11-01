@@ -1,6 +1,6 @@
 import os
 import re
-from typing import Dict, List
+from typing import Dict, List, Sequence
 
 from fastapi_logging_kit.checks import Error
 from fastapi_logging_kit.constants import (
@@ -136,9 +136,7 @@ def validate_format_string(format_str: str, config_name: str) -> List[Error]:
     return errors
 
 
-def validate_format_option(
-    format_option: FormatOption, config_name: str
-) -> List[Error]:
+def validate_format_option(format_option: object, config_name: str) -> List[Error]:
     errors = []
     if isinstance(format_option, int):
         if format_option not in FORMAT_OPTIONS:
@@ -208,6 +206,7 @@ def validate_date_format(date_format: str, config_name: str) -> List[Error]:
 
 
 def validate_email_notifier(notifier_config: LogEmailNotifier) -> List[Error]:
+    # pylint: disable=unidiomatic-typecheck
     errors = []
     if not isinstance(notifier_config, dict):
         errors.append(
@@ -264,7 +263,7 @@ def validate_integer_setting(value: int, config_name: str) -> List[Error]:
 
 
 def validate_log_file_format_types(
-    format_types: Dict,
+    format_types: object,
     config_name: str,
     valid_levels: LogLevels,
     valid_formats: List[str],
@@ -300,7 +299,7 @@ def validate_log_file_format_types(
 
 
 def validate_extra_log_files(
-    extra_log_files: Dict, config_name: str, valid_levels: LogLevels
+    extra_log_files: object, config_name: str, valid_levels: LogLevels
 ) -> List[Error]:
     errors = []
     if not isinstance(extra_log_files, dict):
@@ -333,13 +332,12 @@ def validate_extra_log_files(
 
 
 def validate_rotation_config(
-    rotation_config: Dict, config_name: str, valid_levels: List[str]
+    rotation_config: object, config_name: str, valid_levels: Sequence[str]
 ) -> List[Error]:
     """Validate a LOG_ROTATION or LOG_ROTATION_OVERRIDES configuration dict.
 
-    For LOG_ROTATION pass the top-level dict directly. For
-    LOG_ROTATION_OVERRIDES pass each per-level sub-dict.
-
+    For LOG_ROTATION pass the top-level dict directly. For LOG_ROTATION_OVERRIDES pass
+    each per-level sub-dict.
     """
     errors: List[Error] = []
 
@@ -423,7 +421,7 @@ def validate_rotation_config(
 
 
 def validate_rotation_overrides(
-    overrides: Dict, config_name: str, valid_levels: List[str]
+    overrides: object, config_name: str, valid_levels: Sequence[str]
 ) -> List[Error]:
     """Validate the LOG_ROTATION_OVERRIDES dictionary."""
     errors: List[Error] = []

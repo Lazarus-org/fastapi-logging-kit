@@ -1,13 +1,12 @@
 """Shared plumbing for the ``fastapi_logging_kit`` CLI commands.
 
-``django_logging`` shipped its commands as Django management commands,
-which gave them ``self.stdout.write`` and ``self.style.SUCCESS(...)``.
-FastAPI projects have no ``manage.py``, so the equivalents here are
-plain callables exposed through a Typer application.
+``django_logging`` shipped its commands as Django management commands, which gave them
+``self.stdout.write`` and ``self.style.SUCCESS(...)``. FastAPI projects have no
+``manage.py``, so the equivalents here are plain callables exposed through a Typer
+application.
 
-Each command module defines a ``run()`` function holding all the logic,
-so the commands can be tested directly without going through the CLI.
-
+Each command module defines a ``run()`` function holding all the logic, so the commands
+can be tested directly without going through the CLI.
 """
 
 from typing import Any, Callable, List, Optional
@@ -18,9 +17,8 @@ import typer
 class Style:
     """ANSI styling helpers mirroring Django's ``self.style``.
 
-    Each method wraps its argument in the colour Django uses for the
-    same message class, so ported command bodies keep reading the same.
-
+    Each method wraps its argument in the colour Django uses for the same message class,
+    so ported command bodies keep reading the same.
     """
 
     @staticmethod
@@ -58,7 +56,6 @@ class OutputWrapper:
     Attributes:
         lines (List[str]): Every message written through this wrapper.
         echo (bool): Whether messages are also printed to the terminal.
-
     """
 
     def __init__(self, echo: bool = True) -> None:
@@ -66,7 +63,6 @@ class OutputWrapper:
 
         Args:
             echo (bool): Whether to print messages as they are written.
-
         """
         self.lines: List[str] = []
         self.echo = echo
@@ -76,7 +72,6 @@ class OutputWrapper:
 
         Args:
             message (str): The message to write.
-
         """
         self.lines.append(message)
         if self.echo:
@@ -87,7 +82,6 @@ class OutputWrapper:
 
         Returns:
             str: The accumulated output.
-
         """
         return "\n".join(self.lines)
 
@@ -101,19 +95,19 @@ class BaseCommand:
     Attributes:
         stdout (OutputWrapper): Where command output is written.
         style (Style): The styling helpers.
-
     """
 
     help: str = ""
 
-    def __init__(self, stdout: Optional[OutputWrapper] = None, echo: bool = True) -> None:
+    def __init__(
+        self, stdout: Optional[OutputWrapper] = None, echo: bool = True
+    ) -> None:
         """Initialize the command.
 
         Args:
             stdout (Optional[OutputWrapper]): An output wrapper to use.
             echo (bool): Whether output is printed when creating a
                 wrapper implicitly.
-
         """
         self.stdout = stdout if stdout is not None else OutputWrapper(echo=echo)
         self.style = Style()
@@ -127,12 +121,13 @@ class BaseCommand:
 
         Raises:
             NotImplementedError: Always, unless overridden by a subclass.
-
         """
         raise NotImplementedError("handle must be implemented by subclass")
 
 
-def build_runner(command_class: Callable[..., BaseCommand]) -> Callable[..., OutputWrapper]:
+def build_runner(
+    command_class: Callable[..., BaseCommand],
+) -> Callable[..., OutputWrapper]:
     """Return a ``run()`` callable that instantiates and runs a command.
 
     Args:
@@ -141,7 +136,6 @@ def build_runner(command_class: Callable[..., BaseCommand]) -> Callable[..., Out
     Returns:
         Callable[..., OutputWrapper]: A function running the command and
         returning its output wrapper.
-
     """
 
     def run(*args: Any, echo: bool = True, **kwargs: Any) -> OutputWrapper:

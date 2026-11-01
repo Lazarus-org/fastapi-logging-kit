@@ -1,9 +1,9 @@
 """Validation for FASTAPI_LOGGING['STRUCTURED_LOGGING'].
 
-No Django dependencies: validation is reusable at runtime and by system
-checks.
-
+No Django dependencies: validation is reusable at runtime and by system checks.
 """
+
+from typing import cast
 
 from fastapi_logging_kit.constants.structured_logging import STRUCTURED_LOGGING_DEFAULTS
 
@@ -58,4 +58,4 @@ def resolve_structured_logging(config: object = None) -> dict:
     errors = structured_logging_errors(user)
     if errors:
         raise ValueError("; ".join(errors))
-    return {**STRUCTURED_LOGGING_DEFAULTS, **user}
+    return {**STRUCTURED_LOGGING_DEFAULTS, **cast(dict, user)}

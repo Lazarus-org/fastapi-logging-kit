@@ -22,7 +22,6 @@ def check_email_settings(require_admin_email: bool = True) -> List[Error]:
 
     Returns:
         List[Error]: An error for each missing required email setting.
-
     """
     errors: List[Error] = []
 

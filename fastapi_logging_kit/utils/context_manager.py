@@ -3,7 +3,10 @@ from logging import Logger, PlaceHolder, getLogger
 from typing import Dict, Iterator, Union
 
 from fastapi_logging_kit.settings.conf import LogConfig, LogManager
-from fastapi_logging_kit.utils.get_conf import get_config, is_auto_initialization_enabled
+from fastapi_logging_kit.utils.get_conf import (
+    get_config,
+    is_auto_initialization_enabled,
+)
 
 
 @contextmanager
@@ -15,7 +18,6 @@ def config_setup() -> Iterator[LogManager]:
 
     Yields:
         LogManager: The log manager instance with the custom configuration.
-
     """
     if is_auto_initialization_enabled():
         raise ValueError(
@@ -54,7 +56,6 @@ def _restore_logging_config(
         original_config (Dict[str, Logger | PlaceHolder]): The original logger dictionary.
         original_level (int): The original root logger level.
         original_handlers (list): The original root logger handlers.
-
     """
     logger.manager.loggerDict.clear()
     logger.manager.loggerDict.update(original_config)

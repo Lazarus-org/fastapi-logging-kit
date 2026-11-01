@@ -25,7 +25,6 @@ class MonitorLogSizeMiddleware(BaseMiddleware):
     Attributes:
     ----------
         app (ASGIApp): The next application in the middleware stack.
-
     """
 
     async def dispatch(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -36,7 +35,6 @@ class MonitorLogSizeMiddleware(BaseMiddleware):
             scope (Scope): The ASGI connection scope.
             receive (Receive): The ASGI receive channel.
             send (Send): The ASGI send channel.
-
         """
         if await anyio.to_thread.run_sync(self.should_run_task):
             await anyio.to_thread.run_sync(self.run_log_size_check)
@@ -50,7 +48,6 @@ class MonitorLogSizeMiddleware(BaseMiddleware):
 
         Returns:
             datetime: The current UTC time.
-
         """
         return datetime.now(timezone.utc)
 
@@ -61,7 +58,6 @@ class MonitorLogSizeMiddleware(BaseMiddleware):
         Returns:
         -------
             bool: True if a week has passed since the last audit, False otherwise.
-
         """
         last_run = cache.get(CACHE_KEY)
         if last_run is None or cls._now() - last_run > timedelta(weeks=1):
@@ -72,11 +68,11 @@ class MonitorLogSizeMiddleware(BaseMiddleware):
     def run_log_size_check(self) -> None:
         """Runs the 'logs_size_audit' command to check the log directory size.
 
-        If an error occurs during the execution of the command, it is
-        logged.
-
+        If an error occurs during the execution of the command, it is logged.
         """
-        from fastapi_logging_kit.commands.logs_size_audit import run as run_logs_size_audit
+        from fastapi_logging_kit.commands.logs_size_audit import (
+            run as run_logs_size_audit,
+        )
 
         logger.info("Running 'logs_size_audit' command...")
         try:

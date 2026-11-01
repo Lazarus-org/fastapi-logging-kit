@@ -7,20 +7,21 @@ from typing import Any, Dict, Tuple
 from fastapi_logging_kit.commands.base import BaseCommand, build_runner
 from fastapi_logging_kit.exceptions import ImproperlyConfigured
 from fastapi_logging_kit.settings import settings_manager
-from fastapi_logging_kit.utils.log_email_notifier.notifier import send_email_with_attachment
+from fastapi_logging_kit.utils.log_email_notifier.notifier import (
+    send_email_with_attachment,
+)
 from fastapi_logging_kit.validators.email_settings_validator import check_email_settings
 
 logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    """A command that zips the log directory and sends it to the specified
-    email address.
+    """A command that zips the log directory and sends it to the specified email
+    address.
 
-    This command is used to send the log files to a specified email
-    address. It zips the log directory, creates an email with the zipped
-    file as an attachment, and sends it to the specified email address.
-
+    This command is used to send the log files to a specified email address. It zips the
+    log directory, creates an email with the zipped file as an attachment, and sends it
+    to the specified email address.
     """
 
     help = "Send log folder to the specified email address"
@@ -31,7 +32,6 @@ class Command(BaseCommand):
         Parameters:
             args (tuple): Positional arguments.
             kwargs (dict): Keyword arguments, containing the ``email`` to send to.
-
         """
         email: str = kwargs["email"]  # type: ignore[assignment]
 
@@ -72,8 +72,7 @@ class Command(BaseCommand):
 
     @staticmethod
     def validate_email_settings(require_admin_email: bool = False) -> None:
-        """Check if all required email settings are present in the
-        configuration.
+        """Check if all required email settings are present in the configuration.
 
         Args:
             require_admin_email (bool): Whether ADMIN_EMAIL is also required.
@@ -81,7 +80,6 @@ class Command(BaseCommand):
         Raises:
             ImproperlyConfigured: If any of the required email settings
                 are missing.
-
         """
         errors = check_email_settings(require_admin_email=require_admin_email)
         if errors:

@@ -1,11 +1,9 @@
 """Helpers for pulling client details out of a Starlette/FastAPI request.
 
-``django_logging`` read these from ``request.META`` and exposed them as
-static methods on ``RequestLogMiddleware``. Starlette carries the same
-information on ``request.headers`` and ``request.client``, and keeping
-the helpers in their own module lets the email handler use them without
-importing the middleware.
-
+``django_logging`` read these from ``request.META`` and exposed them as static methods
+on ``RequestLogMiddleware``. Starlette carries the same information on
+``request.headers`` and ``request.client``, and keeping the helpers in their own module
+lets the email handler use them without importing the middleware.
 """
 
 import ipaddress
@@ -18,10 +16,10 @@ UNKNOWN_USER_AGENT = "Unknown User Agent"
 def get_ip_address(request: Any) -> str:
     """Return the immediate ASGI peer address without trusting proxy headers.
 
-    Forwarded addresses are security-sensitive and must be resolved by the
-    middleware using an explicit trusted-proxy policy. This helper is also used
-    by email notifications, where no proxy policy is available, so it always
-    falls back to the transport peer.
+    Forwarded addresses are security-sensitive and must be resolved by the middleware
+    using an explicit trusted-proxy policy. This helper is also used by email
+    notifications, where no proxy policy is available, so it always falls back to the
+    transport peer.
     """
     client = getattr(request, "client", None)
     host = getattr(client, "host", None) if client is not None else None
@@ -41,7 +39,6 @@ def get_user_agent(request: Any) -> str:
 
     Returns:
         str: The client's user agent, or ``"Unknown User Agent"``.
-
     """
     return request.headers.get("user-agent", UNKNOWN_USER_AGENT)
 
@@ -54,7 +51,6 @@ def get_request_id(request: Any) -> Optional[str]:
 
     Returns:
         Optional[str]: The value of the ``X-Request-ID`` header, or None.
-
     """
     return request.headers.get("x-request-id")
 
@@ -75,7 +71,6 @@ def get_user(request: Any) -> str:
     Returns:
         str: A ``"[username (ID:pk)]"`` style description, or
         ``"Anonymous"`` when no user is present.
-
     """
     scope = getattr(request, "scope", None) or {}
     user = scope.get("user")

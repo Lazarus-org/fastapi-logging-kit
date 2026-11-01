@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Dict, Mapping, Optional, cast
 
 from fastapi_logging_kit.constants import DefaultConsoleSettings, DefaultLoggingSettings
 from fastapi_logging_kit.constants.config_types import (
@@ -68,12 +68,11 @@ class SettingsManager:
         debug (bool): Whether the application runs in debug mode.
         log_rotation (LogRotationConfig): Global rotation defaults for all levels.
         log_rotation_overrides (LogRotationOverrides): Per-level rotation overrides.
-
     """
 
     def __init__(self, log_settings: Optional[Mapping[str, Any]] = None) -> None:
-        """Initializes all settings from the supplied mapping, environment
-        variables and finally the packaged defaults.
+        """Initializes all settings from the supplied mapping, environment variables and
+        finally the packaged defaults.
 
         Args:
             log_settings (Optional[Mapping[str, Any]]): An explicit
@@ -82,7 +81,6 @@ class SettingsManager:
 
         Raises:
             ValueError: If ``log_settings`` is not a mapping.
-
         """
         self.load(log_settings)
 
@@ -91,8 +89,8 @@ class SettingsManager:
     # ------------------------------------------------------------------
 
     def load(self, log_settings: Optional[Mapping[str, Any]] = None) -> None:
-        """(Re)resolve every setting from *log_settings*, the environment and
-        the defaults.
+        """(Re)resolve every setting from *log_settings*, the environment and the
+        defaults.
 
         Args:
             log_settings (Optional[Mapping[str, Any]]): An explicit
@@ -100,7 +98,6 @@ class SettingsManager:
 
         Raises:
             ValueError: If ``log_settings`` is not a mapping.
-
         """
         if log_settings is None:
             log_settings = {}
@@ -149,7 +146,9 @@ class SettingsManager:
         # Read through a mapping-safe view: a malformed LOG_EMAIL_NOTIFIER is
         # the validators' problem to report, and loading must not crash before
         # the checks get the chance to say so.
-        notifier = self.email_notifier if isinstance(self.email_notifier, Mapping) else {}
+        notifier = (
+            self.email_notifier if isinstance(self.email_notifier, Mapping) else {}
+        )
         self.email_notifier_enabled: bool = notifier.get("ENABLE", False)
         self.email_notifier_log_levels: NotifierLogLevels = [
             "ERROR" if notifier.get("NOTIFY_ERROR", False) else None,
@@ -158,7 +157,9 @@ class SettingsManager:
         self.email_notifier_log_format: FormatOption = notifier.get("LOG_FORMAT", 1)
         email_settings = self.get("EMAIL", self.default_logging.email_settings)
         self.email_settings: EmailSettings = (
-            email_settings if isinstance(email_settings, Mapping) else {}
+            cast(EmailSettings, email_settings)
+            if isinstance(email_settings, Mapping)
+            else {}
         )
         self.auto_initialization_enabled: bool = self.get(
             "AUTO_INITIALIZATION_ENABLE",
@@ -197,13 +198,12 @@ class SettingsManager:
         Args:
             **kwargs (Any): Configuration keys such as ``LOG_DIR`` or
                 ``LOG_FILE_LEVELS``.
-
         """
         self.load(kwargs)
 
     def reset(self) -> None:
-        """Discard any explicit configuration and fall back to environment
-        variables and defaults."""
+        """Discard any explicit configuration and fall back to environment variables and
+        defaults."""
         self.load({})
 
     # ------------------------------------------------------------------
@@ -211,8 +211,7 @@ class SettingsManager:
     # ------------------------------------------------------------------
 
     def get(self, key: str, default_value: Any) -> Any:
-        """Retrieves a setting from the configuration, returning the default if
-        absent.
+        """Retrieves a setting from the configuration, returning the default if absent.
 
         Args:
             key (str): The key to look up.
@@ -220,7 +219,6 @@ class SettingsManager:
 
         Returns:
             Any: The configured value or the default.
-
         """
         return self.log_settings.get(key, default_value)
 
@@ -234,7 +232,6 @@ class SettingsManager:
 
         Returns:
             Dict[str, Any]: The configuration derived from the environment.
-
         """
         config: Dict[str, Any] = {}
         for env_key, raw_value in os.environ.items():

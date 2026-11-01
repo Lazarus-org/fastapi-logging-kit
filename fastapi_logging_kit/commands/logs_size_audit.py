@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    """Check the total size of the logs directory and send a warning if it
-    exceeds the configured limit.
+    """Check the total size of the logs directory and send a warning if it exceeds the
+    configured limit.
 
     This extended version also breaks down the size by category:
     - Active log files  (``<level>.log``)
@@ -28,7 +28,6 @@ class Command(BaseCommand):
 
     Attributes:
         help (str): Brief description of the command's functionality.
-
     """
 
     help = (
@@ -42,7 +41,6 @@ class Command(BaseCommand):
         Args:
             *args: Positional arguments passed to the command.
             **kwargs: Keyword arguments passed to the command.
-
         """
         log_dir = settings_manager.log_dir
 
@@ -80,17 +78,18 @@ class Command(BaseCommand):
             logger.info("Log directory size is under the limit: %s MB", total_size_mb)
 
     def _categorize_files(self, log_dir: str) -> Dict[str, Tuple[List[str], int]]:
-        """Walk *log_dir* and categorize files into active, rotated, archived,
-        and compressed buckets.
+        """Walk *log_dir* and categorize files into active, rotated, archived, and
+        compressed buckets.
 
         Args:
             log_dir (str): The log directory to walk.
 
         Returns:
             Dict[str, Tuple[List[str], int]]: Category name → (list of paths, total bytes).
-
         """
-        from fastapi_logging_kit.constants.default_settings import DefaultLoggingSettings
+        from fastapi_logging_kit.constants.default_settings import (
+            DefaultLoggingSettings,
+        )
 
         levels = [lvl.lower() for lvl in DefaultLoggingSettings().log_levels]
         active_names = {f"{lvl}.log" for lvl in levels}
@@ -132,7 +131,6 @@ class Command(BaseCommand):
         Args:
             breakdown (Dict[str, Tuple[List[str], int]]): The categorized files.
             total_mb (float): The total size in MB.
-
         """
         self.stdout.write(self.style.HTTP_INFO("\nLog directory size breakdown:"))
         for category, (paths, size) in breakdown.items():
@@ -152,7 +150,6 @@ class Command(BaseCommand):
         Args:
             total_size_mb: Total log directory size in MB.
             breakdown: Per-category size breakdown from ``_categorize_files``.
-
         """
         lines = [
             f"The size of the log files has exceeded {self.size_limit} MB.\n",

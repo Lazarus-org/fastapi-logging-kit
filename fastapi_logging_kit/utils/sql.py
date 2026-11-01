@@ -1,11 +1,12 @@
 """Bounded, context-local SQL query diagnostics.
 
 FastAPI does not prescribe a database layer. Applications can use
-:func:`record_query` from their own instrumentation or install the optional
-SQLAlchemy event integration with :func:`instrument_sqlalchemy`.
+:func:`record_query` from their own instrumentation or install the
+optional SQLAlchemy event integration with
+:func:`instrument_sqlalchemy`.
 
-Request and execution scopes use :func:`query_capture` so query history is
-isolated, bounded and restored when the scope exits.
+Request and execution scopes use :func:`query_capture` so query history
+is isolated, bounded and restored when the scope exits.
 """
 
 from __future__ import annotations
@@ -19,9 +20,9 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Iterator, List, Optional
 
-_queries: contextvars.ContextVar[
-    Optional[List[Dict[str, str]]]
-] = contextvars.ContextVar("_fl_sql_query_log", default=None)
+_queries: contextvars.ContextVar[list[dict[str, str]] | None] = contextvars.ContextVar(
+    "_fl_sql_query_log", default=None
+)
 
 
 @dataclass
@@ -34,17 +35,17 @@ class _CaptureLimits:
     truncated: bool = False
 
 
-_capture_limits: contextvars.ContextVar[Optional[_CaptureLimits]] = (
-    contextvars.ContextVar("_fl_sql_capture_limits", default=None)
+_capture_limits: contextvars.ContextVar[_CaptureLimits | None] = contextvars.ContextVar(
+    "_fl_sql_capture_limits", default=None
 )
-_implicit_limits: contextvars.ContextVar[Optional[_CaptureLimits]] = (
+_implicit_limits: contextvars.ContextVar[_CaptureLimits | None] = (
     contextvars.ContextVar("_fl_sql_implicit_limits", default=None)
 )
 _DEFAULT_MAX_BYTES = 65_536
 _DEFAULT_MAX_QUERIES = 1_000
 
 
-def get_queries() -> List[Dict[str, str]]:
+def get_queries() -> list[dict[str, str]]:
     """Return the query list associated with the current execution context."""
     queries = _queries.get()
     if queries is None:
@@ -56,9 +57,9 @@ def get_queries() -> List[Dict[str, str]]:
 def record_query(sql: str, duration: float) -> None:
     """Record a query, respecting the active capture scope's resource limits.
 
-    Calls made outside :func:`query_capture` use a bounded context-local
-    default history. Request middleware and execution tracking use explicit
-    isolated scopes with their own configurable limits.
+    Calls made outside :func:`query_capture` use a bounded context-local default
+    history. Request middleware and execution tracking use explicit isolated scopes with
+    their own configurable limits.
     """
     if not isinstance(sql, str):
         raise TypeError("sql must be a string")
@@ -103,8 +104,8 @@ def record_query(sql: str, duration: float) -> None:
 def clear_queries() -> None:
     """Discard query history and reset its implicit resource budget.
 
-    Prefer :func:`query_capture` for request and task scopes because it also
-    restores the previous context on exit.
+    Prefer :func:`query_capture` for request and task scopes because it also restores
+    the previous context on exit.
     """
     _queries.set([])
     limits = _capture_limits.get()
@@ -120,13 +121,14 @@ def clear_queries() -> None:
 @contextmanager
 def query_capture(
     *, max_bytes: int = 4096, max_queries: int = 100
-) -> Iterator[List[Dict[str, str]]]:
+) -> Iterator[list[dict[str, str]]]:
     """Create an isolated bounded query-capture scope.
 
     Nested scopes are safe: exiting restores the caller's previous query
     history and capture policy. A query that would exceed either limit is
     not retained and marks the capture as truncated.
     """
+    # pylint: disable=unidiomatic-typecheck
     if type(max_bytes) is not int or max_bytes < 0:
         raise ValueError("max_bytes must be a non-negative integer")
     if type(max_queries) is not int or max_queries < 1:
@@ -155,9 +157,9 @@ def query_capture_truncated() -> bool:
 def instrument_sqlalchemy(engine: Any) -> None:
     """Instrument a SQLAlchemy Engine or AsyncEngine exactly once.
 
-    SQLAlchemy is an optional dependency. AsyncEngine is supported through
-    its synchronous event target. Failed statements are recorded as well as
-    successful statements.
+    SQLAlchemy is an optional dependency. AsyncEngine is supported through its
+    synchronous event target. Failed statements are recorded as well as successful
+    statements.
     """
     from sqlalchemy import event  # pylint: disable=import-outside-toplevel
 

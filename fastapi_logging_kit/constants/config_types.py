@@ -86,10 +86,9 @@ class LogRotationOverrides(TypedDict, total=False):
 class EmailSettings(TypedDict, total=False):
     """SMTP settings used by the email notifier.
 
-    In ``django_logging`` these lived as top-level Django settings.
-    FastAPI has no global settings module, so they are namespaced under
-    the ``EMAIL`` key of the ``fastapi_logging_kit`` configuration instead.
-
+    In ``django_logging`` these lived as top-level Django settings. FastAPI has no
+    global settings module, so they are namespaced under the ``EMAIL`` key of the
+    ``fastapi_logging_kit`` configuration instead.
     """
 
     EMAIL_HOST: str

@@ -9,7 +9,6 @@ def format_elapsed_time(elapsed_time: float) -> str:
 
     Returns:
         A string representing the formatted time.
-
     """
     minutes, seconds = divmod(elapsed_time, 60)
 

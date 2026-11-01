@@ -1,7 +1,10 @@
 from typing import Any, Dict, List
 
 from fastapi_logging_kit.checks import Error, register
-from fastapi_logging_kit.constants import ALLOWED_FILE_FORMAT_TYPES, DefaultLoggingSettings
+from fastapi_logging_kit.constants import (
+    ALLOWED_FILE_FORMAT_TYPES,
+    DefaultLoggingSettings,
+)
 from fastapi_logging_kit.settings import settings_manager
 from fastapi_logging_kit.validators.config_validators import (
     validate_boolean_setting,
@@ -64,7 +67,6 @@ def check_logging_settings(app_configs: Dict[str, Any], **kwargs: Any) -> List[E
     This function utilizes validators from `fastapi_logging_kit.validators`
     to perform detailed checks on each setting. If email notifications are enabled,
     additional checks are performed on email settings to ensure proper configuration.
-
     """
     errors: List[Error] = []
     logging_defaults = DefaultLoggingSettings()

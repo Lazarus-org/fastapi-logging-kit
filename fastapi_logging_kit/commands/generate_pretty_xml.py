@@ -2,9 +2,11 @@ import os
 from typing import Any, Dict, Tuple
 
 from fastapi_logging_kit.commands.base import BaseCommand, build_runner
-
 from fastapi_logging_kit.settings import settings_manager
-from fastapi_logging_kit.utils.command.process_file import process_files, setup_directories
+from fastapi_logging_kit.utils.command.process_file import (
+    process_files,
+    setup_directories,
+)
 
 
 class Command(BaseCommand):
@@ -16,7 +18,6 @@ class Command(BaseCommand):
 
     Attributes:
         help (str): A brief description of the command's functionality.
-
     """
 
     help = "Find and reformat XML files in a directory"
@@ -27,7 +28,6 @@ class Command(BaseCommand):
         Args:
             *args: Positional arguments passed to the command.
             **kwargs: Keyword arguments passed to the command.
-
         """
         log_dir = settings_manager.log_dir
 
@@ -49,13 +49,12 @@ class Command(BaseCommand):
             )
 
     def reformat_and_write_xml(self, file_path: str, new_file_path: str) -> None:
-        """Reformats XML content by wrapping it in a <logs> element and writes
-        it to a new file.
+        """Reformats XML content by wrapping it in a <logs> element and writes it to a
+        new file.
 
         Args:
             file_path (str): The path of the original XML file to be reformatted.
             new_file_path (str): The path where the reformatted XML file will be saved.
-
         """
         with (
             open(file_path, encoding="utf-8") as infile,

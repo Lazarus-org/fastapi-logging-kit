@@ -1,10 +1,8 @@
 """Non-destructive activation of dictConfig component definitions.
 
-Python's dictConfig does not have an additive/non-global apply
-operation. We reuse its actual component constructors, but attach only
-handlers owned by this package and only change a named application
-logger when explicitly asked.
-
+Python's dictConfig does not have an additive/non-global apply operation. We reuse its
+actual component constructors, but attach only handlers owned by this package and only
+change a named application logger when explicitly asked.
 """
 
 import logging
@@ -28,12 +26,10 @@ def _required_components(
 ) -> tuple[set[str], set[str], set[str]]:
     """Find the components reachable from active logger attachments.
 
-    A declared handler is not necessarily installed. Constructing
-    unattached handlers can open files or invoke arbitrary application
-    factories, even though no logging event will reach them. Follow
-    standard handler-to-handler references (e.g. MemoryHandler.target)
-    before building anything.
-
+    A declared handler is not necessarily installed. Constructing unattached handlers
+    can open files or invoke arbitrary application factories, even though no logging
+    event will reach them. Follow standard handler-to-handler references (e.g.
+    MemoryHandler.target) before building anything.
     """
     package_handlers = set(config["_fast_package_handlers"])
     if mode == "additive":
@@ -104,7 +100,7 @@ def _objects(
     active_handlers, active_formatters, active_filters = _required_components(
         config, mode
     )
-    entries = {
+    entries: dict[str, Any] = {
         "version": 1,
         "formatters": {
             name: spec
@@ -176,7 +172,7 @@ def _objects(
                         f"Handler {name!r} factory did not produce a logging.Handler"
                     )
                 handler.name = f"fastapi_logging_kit:{name}"
-                handler._fastapi_logging_kit_owned = True
+                setattr(handler, "_fastapi_logging_kit_owned", True)
                 constructed[name] = handler
                 configurator.config["handlers"][name] = handler
                 del pending[name]
@@ -196,11 +192,9 @@ def activate(
 ) -> None:
     """Atomically replace package-owned attachments; preserve host handlers.
 
-    Named logger overrides explicitly control level/propagate, and those
-    original values are restored if a later configuration no longer
-    manages the logger. Legacy replace_root remains handled by
-    dictConfig instead.
-
+    Named logger overrides explicitly control level/propagate, and those original values
+    are restored if a later configuration no longer manages the logger. Legacy
+    replace_root remains handled by dictConfig instead.
     """
     # Keep routing changes and rollback in one explicit logging transaction.
     # pylint: disable=too-many-branches,too-many-statements
@@ -294,10 +288,10 @@ def activate(
                     owner.removeHandler(handler)
                 for handler in original_handlers:
                     owner.addHandler(handler)
-                for log_filter in list(owner.filters):
-                    owner.removeFilter(log_filter)
-                for log_filter in original_filters:
-                    owner.addFilter(log_filter)
+                for current_filter in list(owner.filters):
+                    owner.removeFilter(current_filter)
+                for original_filter in original_filters:
+                    owner.addFilter(original_filter)
                 owner.setLevel(level)
                 owner.propagate = propagate
             for handler in handlers.values():
@@ -314,10 +308,8 @@ def temporary_activation(
 ) -> Iterator[None]:
     """Restore the complete logger graph and ownership state after a scope.
 
-    Keep previous handlers alive while temporary handlers are active.
-    The reentrant activation lock serializes setup, teardown, and nested
-    scopes.
-
+    Keep previous handlers alive while temporary handlers are active. The reentrant
+    activation lock serializes setup, teardown, and nested scopes.
     """
     global _CONTROLLED, _ACTIVE_HANDLERS  # pylint: disable=global-statement
     with _LOCK:

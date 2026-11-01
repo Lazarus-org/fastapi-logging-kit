@@ -5,18 +5,17 @@ checks (``django.core.checks``): validators return ``Error`` instances,
 functions decorated with ``@register()`` are collected into a registry,
 and Django runs them at startup.
 
-FastAPI has no such framework, so ``fastapi_logging_kit`` ships an equivalent
-that is deliberately tiny: an :class:`Error` message object, a
-:func:`register` decorator backed by a module-level registry, and
+FastAPI has no such framework, so ``fastapi_logging_kit`` ships an
+equivalent that is deliberately tiny: an :class:`Error` message object,
+a :func:`register` decorator backed by a module-level registry, and
 :func:`run_checks` which executes every registered check and returns the
 combined list of errors.
 
-Unlike Django — which aborts startup on any error — ``fastapi_logging_kit``
-reports check failures as warnings on the ``fastapi_logging_kit`` logger so a
-misconfigured application still boots with a usable default
-configuration. Call :func:`run_checks` directly if you would rather fail
-loudly.
-
+Unlike Django — which aborts startup on any error —
+``fastapi_logging_kit`` reports check failures as warnings on the
+``fastapi_logging_kit`` logger so a misconfigured application still
+boots with a usable default configuration. Call :func:`run_checks`
+directly if you would rather fail loudly.
 """
 
 from dataclasses import dataclass, field
@@ -37,7 +36,6 @@ class CheckMessage:
         hint (Optional[str]): An optional suggestion for fixing it.
         id (Optional[str]): A stable identifier such as ``fastapi_logging_kit.E001``.
         level (str): The severity of the message.
-
     """
 
     msg: str
@@ -63,9 +61,8 @@ class CheckMessage:
 class Error(CheckMessage):
     """An ``ERROR``-level check message.
 
-    Mirrors ``django.core.checks.Error`` closely enough that the
-    validator code ported from ``django_logging`` needs no changes.
-
+    Mirrors ``django.core.checks.Error`` closely enough that the validator code ported
+    from ``django_logging`` needs no changes.
     """
 
     level: str = field(default="ERROR")
@@ -91,7 +88,6 @@ def register(check: Optional[CheckFunction] = None) -> Any:
     Returns:
         Any: The decorated function, or a decorator when called with
         parentheses.
-
     """
 
     def inner(func: CheckFunction) -> CheckFunction:
@@ -104,7 +100,9 @@ def register(check: Optional[CheckFunction] = None) -> Any:
     return inner(check)
 
 
-def run_checks(app_configs: Optional[Dict[str, Any]] = None, **kwargs: Any) -> List[Error]:
+def run_checks(
+    app_configs: Optional[Dict[str, Any]] = None, **kwargs: Any
+) -> List[Error]:
     """Run every registered check and return the combined errors.
 
     Args:
@@ -114,7 +112,6 @@ def run_checks(app_configs: Optional[Dict[str, Any]] = None, **kwargs: Any) -> L
 
     Returns:
         List[Error]: Every error reported by the registered checks.
-
     """
     errors: List[Error] = []
     for check in registry:

@@ -66,7 +66,6 @@ def set_config(
         ValueError: If invalid log configuration parameters are provided.
         ImproperlyConfigured: If the configuration is not set up correctly.
         AttributeError: If an attribute-related error occurs during setup.
-
     """
     if not is_auto_initialization_enabled():
         return

@@ -1,15 +1,14 @@
 """Jinja2 templating for ``fastapi_logging_kit``.
 
 ``django_logging`` rendered its email and LogiBoard templates through
-``django.template.engines["django"]``. FastAPI has no template engine of
-its own, so ``fastapi_logging_kit`` ships a small Jinja2 environment rooted at
-the package's ``templates/`` directory.
+``django.template.engines["django"]``. FastAPI has no template engine of its own, so
+``fastapi_logging_kit`` ships a small Jinja2 environment rooted at the package's
+``templates/`` directory.
 
-The Django template syntax used by the ported templates (``{{ var }}``
-and ``{% if %}``/``{% endif %}``) is valid Jinja2, so the templates carry
-over essentially unchanged; only ``{% static %}`` tags are rewritten to
-use the :func:`static_url` global.
-
+The Django template syntax used by the ported templates (``{{ var }}`` and ``{% if
+%}``/``{% endif %}``) is valid Jinja2, so the templates carry over essentially
+unchanged; only ``{% static %}`` tags are rewritten to use the :func:`static_url`
+global.
 """
 
 import os
@@ -38,7 +37,6 @@ def static_url(path: str) -> str:
 
     Returns:
         str: The absolute URL the asset is served from.
-
     """
     return f"{STATIC_URL_PREFIX}/{path.lstrip('/')}"
 
@@ -48,7 +46,6 @@ def _build_environment() -> Environment:
 
     Returns:
         Environment: A configured Jinja2 environment.
-
     """
     env = Environment(
         loader=FileSystemLoader(TEMPLATES_DIR),
@@ -73,7 +70,6 @@ def render_to_string(
 
     Returns:
         str: The rendered template.
-
     """
     template = environment.get_template(template_name)
     return template.render(**(context or {}))

@@ -12,7 +12,6 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi_logging_kit.commands.base import BaseCommand, build_runner
-
 from fastapi_logging_kit.settings import settings_manager
 
 logger = logging.getLogger(__name__)
@@ -36,7 +35,6 @@ class Command(BaseCommand):
        (``--bundle tar.gz`` or ``--bundle zip``).
 
     The active ``.log`` files are never touched.
-
     """
 
     help = (
@@ -52,7 +50,6 @@ class Command(BaseCommand):
             *args: Positional arguments passed to the command.
             **kwargs: ``compress``, ``bundle`` and ``dry_run`` flags,
                 supplied by the CLI or by a direct ``run()`` call.
-
         """
         log_dir: str = settings_manager.log_dir
         compress: bool = kwargs.get("compress", False)
@@ -93,7 +90,7 @@ class Command(BaseCommand):
         )
 
         # --- Step 2: bundle the directory if requested ---
-        if bundle:
+        if bundle and bundle_path is not None:
             self._bundle_directory(archive_dir, bundle_path, bundle)
 
     # ------------------------------------------------------------------
@@ -103,10 +100,12 @@ class Command(BaseCommand):
     def _collect_rotated_files(self, log_dir: str) -> List[str]:
         """Select only recognized rotated log files, excluding symlinks.
 
-        Active log files, arbitrary files, and the archive tree are never
-        moved. Relative directory structure is retained by ``_move_files``.
+        Active log files, arbitrary files, and the archive tree are never moved.
+        Relative directory structure is retained by ``_move_files``.
         """
-        from fastapi_logging_kit.constants.default_settings import DefaultLoggingSettings
+        from fastapi_logging_kit.constants.default_settings import (
+            DefaultLoggingSettings,
+        )
 
         levels = set(DefaultLoggingSettings().log_levels)
         configured = settings_manager.log_levels
@@ -127,7 +126,8 @@ class Command(BaseCommand):
         rotated: List[str] = []
         for root, dirs, files in os.walk(log_dir, followlinks=False):
             dirs[:] = [
-                name for name in dirs
+                name
+                for name in dirs
                 if name != "archive" and not os.path.islink(os.path.join(root, name))
             ]
             for filename in files:
@@ -163,7 +163,8 @@ class Command(BaseCommand):
 
             if compress and not source_path.endswith(".gz"):
                 descriptor, temporary = tempfile.mkstemp(
-                    prefix=".fastapi-logging-kit-", suffix=".tmp",
+                    prefix=".fastapi-logging-kit-",
+                    suffix=".tmp",
                     dir=os.path.dirname(destination),
                 )
                 try:
@@ -193,7 +194,6 @@ class Command(BaseCommand):
             archive_dir: The directory to bundle.
             bundle_path: Full destination path for the bundle file.
             fmt: One of ``"tar.gz"`` or ``"zip"``.
-
         """
         if fmt == "tar.gz":
             self._make_targz(archive_dir, bundle_path)
@@ -216,8 +216,7 @@ class Command(BaseCommand):
 
     @staticmethod
     def _make_targz(source_dir: str, dest_path: str) -> None:
-        """Create a gzip-compressed tar archive of *source_dir* at
-        *dest_path*."""
+        """Create a gzip-compressed tar archive of *source_dir* at *dest_path*."""
         with tarfile.open(dest_path, "w:gz") as tar:
             tar.add(source_dir, arcname=os.path.basename(source_dir))
 

@@ -41,7 +41,6 @@ def _report_errors(errors: List[Error]) -> None:
 
     Args:
         errors (List[Error]): The errors reported by the checks.
-
     """
     if not errors:
         return
@@ -68,11 +67,14 @@ def _report_errors(errors: List[Error]) -> None:
 _STRUCTURED_LOCK = RLock()
 
 
-def _setup_structured(app: Optional[Any], config: Mapping[str, Any], *, add_middleware: bool) -> None:
+def _setup_structured(
+    app: Optional[Any], config: Mapping[str, Any], *, add_middleware: bool
+) -> None:
     """Apply the approved v1 contract and add request middleware once."""
-    from fastapi_logging_kit.settings.contract import compile_settings
-    from fastapi_logging_kit.settings.components import compile_components
+    # pylint: disable=too-many-branches
     from fastapi_logging_kit.settings.activation import activate
+    from fastapi_logging_kit.settings.components import compile_components
+    from fastapi_logging_kit.settings.contract import compile_settings
 
     compiled = compile_settings(config)
     if not compiled["ENABLED"]:
@@ -84,10 +86,14 @@ def _setup_structured(app: Optional[Any], config: Mapping[str, Any], *, add_midd
             previous = getattr(app.state, "_fastapi_logging_kit_structured", None)
             if previous is not None:
                 if previous != compiled:
-                    raise RuntimeError("FastAPI Logging was already configured with different settings")
+                    raise RuntimeError(
+                        "FastAPI Logging was already configured with different settings"
+                    )
                 return
             if getattr(app, "middleware_stack", None) is not None:
-                raise RuntimeError("Configure FastAPI Logging before starting the ASGI application")
+                raise RuntimeError(
+                    "Configure FastAPI Logging before starting the ASGI application"
+                )
         logging_conf = compiled["LOGGING"]
         components = compiled["COMPONENTS"]
         if logging_conf:
@@ -97,7 +103,9 @@ def _setup_structured(app: Optional[Any], config: Mapping[str, Any], *, add_midd
             if components:
                 had_root = "root" in logging_conf
                 logging_conf = compile_components(logging_conf, components)
-                logging_conf = {k: v for k, v in logging_conf.items() if not k.startswith("_fast_")}
+                logging_conf = {
+                    k: v for k, v in logging_conf.items() if not k.startswith("_fast_")
+                }
                 if not had_root and not components.get("root_handlers"):
                     # A missing root section must not silently replace the host root.
                     logging_conf.pop("root", None)
@@ -107,9 +115,17 @@ def _setup_structured(app: Optional[Any], config: Mapping[str, Any], *, add_midd
             # additively by the existing transactional component activator.
             preset = {
                 "version": 1,
-                "formatters": {"console": {"format": "%(levelname)s %(name)s: %(message)s"}},
+                "formatters": {
+                    "console": {"format": "%(levelname)s %(name)s: %(message)s"}
+                },
                 "filters": {},
-                "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "console", "level": "INFO"}},
+                "handlers": {
+                    "console": {
+                        "class": "logging.StreamHandler",
+                        "formatter": "console",
+                        "level": "INFO",
+                    }
+                },
                 "loggers": {},
                 "root": {"handlers": []},
             }
@@ -119,7 +135,10 @@ def _setup_structured(app: Optional[Any], config: Mapping[str, Any], *, add_midd
         if app is not None:
             if add_middleware and compiled["REQUEST_LOGGING"]["ENABLED"]:
                 from fastapi_logging_kit.middleware import RequestLogMiddleware
-                app.add_middleware(RequestLogMiddleware, config=deepcopy(compiled["REQUEST_LOGGING"]))
+
+                app.add_middleware(
+                    RequestLogMiddleware, config=deepcopy(compiled["REQUEST_LOGGING"])
+                )
             if include_log_iboard():
                 _install_log_iboard(app)
             app.state._fastapi_logging_kit_structured = compiled
@@ -135,7 +154,9 @@ def _iter_app_routes(
         included = getattr(route, "original_router", None)
         if included is not None:
             context = getattr(route, "include_context", None)
-            yield from _iter_app_routes(included, prefix + getattr(context, "prefix", ""))
+            yield from _iter_app_routes(
+                included, prefix + getattr(context, "prefix", "")
+            )
 
 
 def _validate_log_iboard(app: Any) -> None:
@@ -152,12 +173,18 @@ def _validate_log_iboard(app: Any) -> None:
             raise RuntimeError(
                 "Cannot install LogiBoard: '/log-iboard/' is already registered."
             )
-        if route_name == "fastapi-logging-kit-static" and route_path != STATIC_URL_PREFIX:
+        if (
+            route_name == "fastapi-logging-kit-static"
+            and route_path != STATIC_URL_PREFIX
+        ):
             raise RuntimeError(
                 "The route named 'fastapi-logging-kit-static' is registered at an "
                 f"unexpected path: {route_path!r}."
             )
-        if route_name != "fastapi-logging-kit-static" and route_path == STATIC_URL_PREFIX:
+        if (
+            route_name != "fastapi-logging-kit-static"
+            and route_path == STATIC_URL_PREFIX
+        ):
             raise RuntimeError(
                 f"Cannot mount LogiBoard assets: {STATIC_URL_PREFIX!r} "
                 "is already registered by another route."
@@ -206,9 +233,7 @@ def _install_log_iboard(app: Any) -> None:
     from fastapi_logging_kit.routers import router
 
     _validate_log_iboard(app)
-    has_dashboard = any(
-        name == "log-iboard" for name, _ in _iter_app_routes(app)
-    )
+    has_dashboard = any(name == "log-iboard" for name, _ in _iter_app_routes(app))
     if not has_dashboard:
         app.include_router(router)
     log_iboard_router.mount_static(app)
@@ -239,15 +264,16 @@ def setup_logging(
             the structured contract installs RequestLogMiddleware only.
         run_configuration_checks (bool): Whether to validate the
             configuration and warn about any problems.
-
     """
     if config is None and not settings_manager.log_settings:
         _setup_structured(app, {}, add_middleware=add_middleware)
         return
 
     if config is not None and (
-        "ENABLED" in config or "LOGGING" in config
-        or "COMPONENTS" in config or "REQUEST_LOGGING" in config
+        "ENABLED" in config
+        or "LOGGING" in config
+        or "COMPONENTS" in config
+        or "REQUEST_LOGGING" in config
     ):
         _setup_structured(app, config, add_middleware=add_middleware)
         return

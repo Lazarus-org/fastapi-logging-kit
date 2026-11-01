@@ -1,11 +1,11 @@
 """Compile explicit extensions to FastAPI Logging Kit's dictConfig presets.
 
-The extension API keeps additions, replacements and removals separate. A
-component name is never silently overwritten: use ``replace`` when replacing
-an existing preset or configured component, and ``disable`` to remove one.
+The extension API keeps additions, replacements and removals separate. A component name
+is never silently overwritten: use ``replace`` when replacing an existing preset or
+configured component, and ``disable`` to remove one.
 
-The compiler validates component references before any handlers are created or
-attached to the process-wide logging graph.
+The compiler validates component references before any handlers are created or attached
+to the process-wide logging graph.
 """
 
 from collections.abc import Mapping
@@ -15,6 +15,8 @@ from typing import Any
 from fastapi_logging_kit.exceptions import ImproperlyConfigured
 
 SECTIONS = ("formatters", "filters", "handlers", "loggers")
+
+
 class ComponentConfigurationError(ImproperlyConfigured):
     """Raised when ``FASTAPI_LOGGING['COMPONENTS']`` is invalid."""
 
@@ -32,6 +34,7 @@ def _names(value: Any, location: str) -> list[str]:
 
 def validate_components(extensions: Any) -> None:
     """Validate the extension mapping without importing application code."""
+    # pylint: disable=too-many-branches
     if not isinstance(extensions, Mapping):
         raise ComponentConfigurationError("COMPONENTS must be a dictionary")
 
@@ -104,17 +107,19 @@ def _ensure_sections(config: dict) -> None:
     config.setdefault("root", {"handlers": []})
     if not isinstance(config["root"], Mapping):
         raise ComponentConfigurationError("LOGGING.root must be a dictionary")
-    config["root"] = dict(config["root"])
-    config["root"].setdefault("handlers", [])
+    root = dict(config["root"])
+    root.setdefault("handlers", [])
+    config["root"] = root
 
 
 def compile_components(presets: Mapping[str, Any], extensions: Any) -> dict:
     """Return an independent, validated dictConfig mapping with routing hints.
 
-    The returned private ``_fast_*`` fields are consumed by the package's
-    non-destructive activator and must be stripped before calling
+    The returned private ``_fast_*`` fields are consumed by the package's non-
+    destructive activator and must be stripped before calling
     ``logging.config.dictConfig``.
     """
+    # pylint: disable=too-many-branches,too-many-statements
     validate_components(extensions)
     extensions = deepcopy(dict(extensions))
     config = deepcopy(dict(presets))

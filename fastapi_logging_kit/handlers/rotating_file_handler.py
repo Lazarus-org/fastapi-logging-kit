@@ -4,8 +4,8 @@ import gzip
 import os
 import shutil
 import tempfile
-from typing import Any
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
+from typing import Any
 
 
 def _gzip_namer(default_name: str) -> str:
@@ -16,7 +16,7 @@ def _gzip_namer(default_name: str) -> str:
 def _gzip_rotator(source: str, dest: str) -> None:
     """Atomically publish a complete gzip archive, preserving source on failure.
 
-    Standard RotatingFileHandler is not safe for concurrent multi-process writes.
+    Standard RotatingFileHandler is not safe for concurrent multi- process writes.
     """
     gz_dest = dest if dest.endswith(".gz") else dest + ".gz"
     fd, temporary = tempfile.mkstemp(

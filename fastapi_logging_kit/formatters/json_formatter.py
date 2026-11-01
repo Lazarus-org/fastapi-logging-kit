@@ -2,6 +2,7 @@
 
 import json
 from logging import LogRecord
+from typing import Any
 
 from fastapi_logging_kit.formatters.base import BaseStructuredFormatter
 
@@ -9,14 +10,12 @@ from fastapi_logging_kit.formatters.base import BaseStructuredFormatter
 class JSONFormatter(BaseStructuredFormatter):
     """Serialize typed context/extra fields without altering the log message.
 
-    No attempt is made to infer key=value fields from free-form
-    messages.
-
+    No attempt is made to infer key=value fields from free-form messages.
     """
 
     def format(self, record: LogRecord) -> str:
         data = self._event(record)
-        options = {"ensure_ascii": False, "allow_nan": False}
+        options: dict[str, Any] = {"ensure_ascii": False, "allow_nan": False}
         if self.options["JSON_COMPACT"]:
             options["separators"] = (",", ":")
         else:

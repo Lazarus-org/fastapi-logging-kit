@@ -179,16 +179,17 @@ variable-rgx = "[a-z_][a-z0-9_]{2,30}$"
 
 [tool.bandit]
 exclude_dirs = [
-  "fastapi_logging_kit/tests",
+  "*/tests/*",
+  '*\tests\*',
 ]
 
 [tool.mypy]
-exclude = """
-^docs/conf.py|
-^build/|
-^dist/|
-^fastapi_logging_kit/tests/
-"""
+exclude = [
+  "^build/",
+  "^dist/",
+  '^docs/conf\.py$',
+  "^fastapi_logging_kit/tests/",
+]
 explicit_package_bases = true
 ignore_missing_imports = true
 disallow_untyped_calls = true

@@ -1,9 +1,8 @@
-"""Concurrent-safe colored console output without mutating shared
-formatters."""
+"""Concurrent-safe colored console output without mutating shared formatters."""
 
 import re
-from typing import Any, Mapping
 from logging import Formatter, LogRecord
+from typing import Any, Literal, Mapping
 
 from fastapi_logging_kit.utils.console_colorizer import colorize_log_format
 
@@ -15,7 +14,7 @@ class ColoredFormatter(Formatter):
         self,
         fmt: str | None = None,
         datefmt: str | None = None,
-        style: str = "%",
+        style: Literal["%", "{", "$"] = "%",
         validate: bool = True,
         *,
         defaults: Mapping[str, Any] | None = None,
@@ -25,7 +24,7 @@ class ColoredFormatter(Formatter):
         )
         self._original_fmt = self._style._fmt
         self._formatter_style = style
-        self._colored = {}
+        self._colored: dict[str, Formatter] = {}
 
     def format(self, record: LogRecord) -> str:
         if self._formatter_style != "%" or _ANSI.search(self._original_fmt):

@@ -3,22 +3,23 @@ import os
 from typing import Dict, Tuple
 
 from fastapi_logging_kit.commands.base import BaseCommand, build_runner
-
 from fastapi_logging_kit.settings import settings_manager
-from fastapi_logging_kit.utils.command.process_file import process_files, setup_directories
+from fastapi_logging_kit.utils.command.process_file import (
+    process_files,
+    setup_directories,
+)
 
 
 class Command(BaseCommand):
-    """A command to find JSON files within a specified log
-    directory and generate pretty JSON.
+    """A command to find JSON files within a specified log directory and generate pretty
+    JSON.
 
-    The command looks for `.json` files inside the `json` subdirectory
-    of the log directory, attempts to parse multiple JSON objects from a
-    single file, and then formats them into a valid JSON array.
+    The command looks for `.json` files inside the `json` subdirectory of the log
+    directory, attempts to parse multiple JSON objects from a single file, and then
+    formats them into a valid JSON array.
 
-    The reformatted JSON content is saved in a `pretty` subdirectory
-    with the prefix `formatted_`.
-
+    The reformatted JSON content is saved in a `pretty` subdirectory with the prefix
+    `formatted_`.
     """
 
     help = "Find JSON files in log directory and generates pretty JSON"
@@ -32,7 +33,6 @@ class Command(BaseCommand):
         Args:
             *args: Additional positional arguments (not used).
             **kwargs: Additional keyword arguments (not used).
-
         """
         log_dir = settings_manager.log_dir
 
@@ -55,13 +55,12 @@ class Command(BaseCommand):
             )
 
     def reformat_json(self, file_path: str, new_file_path: str) -> None:
-        """Parses multiple JSON objects from a file incrementally and writes
-        them to a new file as a valid JSON array.
+        """Parses multiple JSON objects from a file incrementally and writes them to a
+        new file as a valid JSON array.
 
         Args:
             file_path (str): The path to the original JSON file.
             new_file_path (str): The path where the reformatted JSON file will be saved.
-
         """
         with (
             open(file_path, encoding="utf-8") as infile,

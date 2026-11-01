@@ -1,9 +1,9 @@
 import importlib
-from copy import deepcopy
 import logging
 import logging.config
 import os
-from typing import Any, Dict, List, Optional
+from copy import deepcopy
+from typing import Any, Dict, List, Optional, cast
 
 from fastapi_logging_kit.constants import (
     ALLOWED_EXTRA_FILE_TYPES,
@@ -26,7 +26,10 @@ from fastapi_logging_kit.constants.config_types import (
 )
 from fastapi_logging_kit.filters.log_level_filter import LoggingLevelFilter
 from fastapi_logging_kit.settings.activation import activate, forget_controlled_loggers
-from fastapi_logging_kit.settings.components import ComponentConfigurationError, compile_components
+from fastapi_logging_kit.settings.components import (
+    ComponentConfigurationError,
+    compile_components,
+)
 
 
 # pylint: disable=too-many-instance-attributes, too-many-arguments, too-many-positional-arguments, too-many-locals
@@ -38,7 +41,6 @@ class LogConfig:
         log_dir (str): The directory where log files will be stored.
         log_rotation (LogRotationConfig): Global rotation defaults.
         log_rotation_overrides (LogRotationOverrides): Per-level rotation overrides.
-
     """
 
     def __init__(
@@ -138,14 +140,12 @@ class LogConfig:
     def get_rotation_config_for_level(self, level: str) -> LogRotationConfig:
         """Return the effective rotation config for *level*.
 
-        Per-level overrides are shallow-merged on top of the global
-        rotation defaults so callers only need to specify the keys that
-        differ.
-
+        Per-level overrides are shallow-merged on top of the global rotation defaults so
+        callers only need to specify the keys that differ.
         """
         effective = dict(self.log_rotation)
         override = self.log_rotation_overrides.get(level, {})
-        effective.update(override)
+        effective.update(cast(dict, override))
         return effective  # type: ignore[return-value]
 
 
@@ -155,7 +155,6 @@ class LogManager:
     Attributes:
         log_config (LogConfig): The logging configuration.
         log_files (Dict[str, str]): A dictionary mapping log levels to file paths.
-
     """
 
     def __init__(self, log_config: LogConfig) -> None:
@@ -172,9 +171,8 @@ class LogManager:
             self.log_files[log_level] = log_file_path
 
     def _planned_log_files(self) -> Dict[str, str]:
-        """Resolve every configured path without creating directories or
-        files."""
-        paths = {}
+        """Resolve every configured path without creating directories or files."""
+        paths: Dict[str, str] = {}
         for level in self.log_config.log_levels:
             kind = self.log_config.log_file_format_types.get(level, "").lower()
             if (
@@ -188,7 +186,8 @@ class LogManager:
                 paths[level] = os.path.join(
                     self.log_config.log_dir, f"{level.lower()}.log"
                 )
-        return {**paths, **self.log_files}
+        paths.update(self.log_files)
+        return paths
 
     def get_log_file(self, log_level: LogLevel) -> Optional[str]:
         """Retrieves the file path for a given log level.
@@ -198,7 +197,6 @@ class LogManager:
 
         Returns:
             Optional[str]: The file path associated with the log level, or None if not found.
-
         """
         return self.log_files.get(log_level)
 
@@ -228,7 +226,9 @@ class LogManager:
         if rotation_type == "size":
             max_bytes = int(rotation.get("MAX_BYTES", 10_485_760))
             if compress:
-                handler_class = "fastapi_logging_kit.handlers.CompressedRotatingFileHandler"
+                handler_class = (
+                    "fastapi_logging_kit.handlers.CompressedRotatingFileHandler"
+                )
             else:
                 handler_class = "logging.handlers.RotatingFileHandler"
             return {
@@ -262,8 +262,7 @@ class LogManager:
         }
 
     def build_logging_dict(self) -> Dict:
-        """Build a standard dictConfig mapping without changing global
-        logging."""
+        """Build a standard dictConfig mapping without changing global logging."""
         if self.log_config.logging_config is not None:
             custom = deepcopy(self.log_config.logging_config)
             if not self.log_config.components:
@@ -382,17 +381,15 @@ class LogManager:
     def set_conf(self, mode: str = "replace_root") -> None:
         """Install handlers using the selected ownership policy.
 
-        ``additive`` is the safe automatic default: package-owned
-        file/email handlers are attached to root alongside existing
-        handlers, and all configured package handlers serve the
-        ``fastapi_logging_kit`` namespace. Root level, other root handlers
-        and application loggers are unchanged.
+        ``additive`` is the safe automatic default: package-owned file/email handlers
+        are attached to root alongside existing handlers, and all configured package
+        handlers serve the ``fastapi_logging_kit`` namespace. Root level, other root
+        handlers and application loggers are unchanged.
 
-        ``isolated`` routes only the ``fastapi_logging_kit`` namespace to
-        package handlers. ``replace_root`` preserves explicit legacy
-        dictConfig setup. Direct set_conf() callers retain their
-        historical root-replacement default for API compatibility.
-
+        ``isolated`` routes only the ``fastapi_logging_kit`` namespace to package
+        handlers. ``replace_root`` preserves explicit legacy dictConfig setup. Direct
+        set_conf() callers retain their historical root-replacement default for API
+        compatibility.
         """
         if mode not in {"additive", "isolated", "replace_root"}:
             raise ValueError("mode must be 'additive', 'isolated', or 'replace_root'")
@@ -405,7 +402,10 @@ class LogManager:
             if config.get("_fast_explicit_package_handlers"):
                 self._set_owned_conf(config, mode="isolated")
         else:
-            if self.log_config.logging_config is not None and not self.log_config.components:
+            if (
+                self.log_config.logging_config is not None
+                and not self.log_config.components
+            ):
                 logging.config.dictConfig(config)
             else:
                 self._set_owned_conf(config, mode=mode)
@@ -427,6 +427,5 @@ class LogManager:
 
     @classmethod
     def _set_owned_conf(cls, config: Dict, *, mode: str) -> None:
-        """Apply the same compiled component graph in additive/isolated
-        modes."""
+        """Apply the same compiled component graph in additive/isolated modes."""
         activate(config, mode=mode, resolver=cls._resolve_class)
