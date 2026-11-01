@@ -276,6 +276,7 @@ ini_options.markers = [
   "validators_rotation: Tests for validators that check rotation configuration inputs.",
   "xml_formatter: Tests for the formatter that structures logs as XML documents.",
 ]
+ini_options.filterwarnings = [ "error::DeprecationWarning", "error::PendingDeprecationWarning" ]
 ini_options.asyncio_default_fixture_loop_scope = "function"
 ini_options.asyncio_mode = "auto"
 
