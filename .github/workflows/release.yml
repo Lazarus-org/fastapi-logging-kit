@@ -20,20 +20,23 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-          cache-dependency-path: pyproject.toml
-      - name: Install build tools
-        run: python -m pip install build twine
+          cache-dependency-path: poetry.lock
+      - name: Install Poetry and build tools
+        run: |
+          python -m pip install "poetry>=2.2,<3"
+          poetry check --lock
+          poetry install --only main,build --no-interaction
       - name: Build distributions
-        run: python -m build --sdist --wheel
+        run: poetry build
       - name: Validate metadata and package files
         run: |
-          python -m twine check dist/*
-          python scripts/verify_distributions.py dist
+          poetry run twine check dist/*
+          poetry run python scripts/verify_distributions.py dist
       - name: Verify release tag matches package version
         if: startsWith(github.ref, 'refs/tags/')
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-        run: python scripts/verify_distributions.py dist --tag "$RELEASE_TAG"
+        run: poetry run python scripts/verify_distributions.py dist --tag "$RELEASE_TAG"
       - uses: actions/upload-artifact@v4
         with:
           name: release-distributions

@@ -1,8 +1,10 @@
 import sys
 import tomllib
+from importlib.metadata import requires
 from pathlib import Path
 
 import pytest
+from packaging.requirements import Requirement
 
 import fastapi_logging_kit
 from fastapi_logging_kit.exceptions import FastLoggingError, ImproperlyConfigured
@@ -79,17 +81,17 @@ class TestPublicApi:
 
         assert (package_root / "py.typed").is_file()
 
-    def test_runtime_requirements_match_pep_621_metadata(self) -> None:
-        """Test that the runtime requirements mirror distribution metadata."""
+    def test_installed_runtime_requirements_match_pep_621_metadata(self) -> None:
+        """Check the built metadata against the authoritative project dependencies."""
         project_root = Path(__file__).resolve().parents[2]
         metadata = tomllib.loads((project_root / "pyproject.toml").read_text())
-        requirements = [
-            line.strip()
-            for line in (project_root / "packages/requirements.txt").read_text().splitlines()
-            if line.strip() and not line.lstrip().startswith("#")
-        ]
-
-        assert requirements == metadata["project"]["dependencies"]
+        expected = {Requirement(value) for value in metadata["project"]["dependencies"]}
+        installed = {
+            Requirement(value)
+            for value in requires(metadata["project"]["name"]) or []
+            if Requirement(value).marker is None
+        }
+        assert installed == expected
 
     def test_supported_python_range_matches_the_approved_matrix(self) -> None:
         """Test that metadata does not claim untested Python releases."""
@@ -99,7 +101,6 @@ class TestPublicApi:
 
         assert metadata["project"]["requires-python"] == ">=3.11,<3.16"
         assert {
-            f"Programming Language :: Python :: 3.{minor}"
-            for minor in range(11, 16)
+            f"Programming Language :: Python :: 3.{minor}" for minor in range(11, 16)
         }.issubset(classifiers)
         assert "Programming Language :: Python :: 3.10" not in classifiers

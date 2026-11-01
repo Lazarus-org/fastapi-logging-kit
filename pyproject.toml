@@ -29,7 +29,6 @@ classifiers = [
   "Framework :: AsyncIO",
   "Framework :: FastAPI",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3 :: Only",
@@ -45,7 +44,7 @@ dependencies = [
   "anyio>=3.4,<5",
   "fastapi>=0.100,<1",
   "jinja2>=3.1,<4",
-  "starlette>=0.27,<1",
+  "starlette>=0.27,<2",
   "typer>=0.12,<1",
 ]
 optional-dependencies.sqlalchemy = [ "sqlalchemy>=2.0.52,<3" ]
@@ -54,6 +53,44 @@ urls.Changelog = "https://github.com/lazarus-org/fastapi-logging-kit/blob/main/C
 urls.Documentation = "https://fastapi-logging-kit.readthedocs.io"
 urls.Issues = "https://github.com/lazarus-org/fastapi-logging-kit/issues"
 scripts.fastapi-logging-kit = "fastapi_logging_kit.commands.cli:main"
+
+[dependency-groups]
+dev = [
+  { include-group = "build" },
+  { include-group = "docs" },
+  { include-group = "quality" },
+  { include-group = "test" },
+]
+test = [
+  "httpx>=0.26,<1",
+  "httpx2>=2,<3",
+  "packaging>=24,<27",
+  "pytest>=9.1,<10",
+  "pytest-asyncio>=1.4.1,<2",
+  "pytest-cov>=7.1,<8",
+  "sqlalchemy>=2.0.52,<3",
+]
+docs = [
+  "sphinx>=8.2,<10",
+  "sphinx-rtd-theme>=3.1,<4",
+]
+build = [
+  "build>=1.3,<2",
+  "commitizen>=4.16.3,<5",
+  "python-semantic-release>=9.8.8,<10",
+  "twine>=6,<8",
+]
+quality = [
+  "bandit[toml]>=1.9.4,<2",
+  "black>=26.5.1,<27",
+  "codecov>=2.1.13,<3",
+  "docformatter>=1.7.8,<2",
+  "isort>=5.13.2,<6",
+  "mypy>=1.11.1,<2",
+  "pre-commit>=4.4,<5",
+  "pylint>=3.2.6,<4",
+  "tox>=4.65,<5",
+]
 
 [tool.poetry]
 packages = [
@@ -68,39 +105,20 @@ include = [
   { path = "CHANGELOG.md", format = "sdist" },
   { path = "docs/*.rst", format = "sdist" },
   { path = "docs/*.py", format = "sdist" },
-  { path = "docs/requirements.txt", format = "sdist" },
   { path = "docs/Makefile", format = "sdist" },
   { path = "docs/make.bat", format = "sdist" },
   { path = "fastapi_logging_kit/py.typed", format = [ "sdist", "wheel" ] },
   { path = "fastapi_logging_kit/static", format = [ "sdist", "wheel" ] },
   { path = "fastapi_logging_kit/templates", format = [ "sdist", "wheel" ] },
   { path = "fastapi_logging_kit/tests", format = "sdist" },
-  { path = "packages", format = "sdist" },
   { path = "scripts", format = "sdist" },
   { path = "tox.ini", format = "sdist" },
   { path = ".readthedocs.yaml", format = "sdist" },
+  { path = "poetry.lock", format = "sdist" },
 ]
 exclude = [
   "fastapi_logging_kit/tests/**",
 ]
-group.dev.dependencies.bandit = { extras = [ "toml" ], version = ">=1.9.4,<2" }
-group.dev.dependencies.black = ">=26.5.1,<27"
-group.dev.dependencies.codecov = "^2.1.13"
-group.dev.dependencies.commitizen = ">=4.16.3,<5"
-group.dev.dependencies.docformatter = ">=1.7.8,<2"
-group.dev.dependencies.httpx = ">=0.27,<1"
-group.dev.dependencies.isort = ">=5.13.2,<6"
-group.dev.dependencies.mypy = ">=1.11.1,<2"
-group.dev.dependencies.pre-commit = ">=4.4,<5"
-group.dev.dependencies.pylint = ">=3.2.6,<4"
-group.dev.dependencies.pytest = ">=9.1,<10"
-group.dev.dependencies.pytest-asyncio = ">=1.4.1,<2"
-group.dev.dependencies.pytest-cov = ">=7.1,<8"
-group.dev.dependencies.python-semantic-release = "^9.8.8"
-group.dev.dependencies.sphinx = ">=8.2,<10"
-group.dev.dependencies.sphinx-rtd-theme = ">=3.1,<4"
-group.dev.dependencies.sqlalchemy = ">=2.0.52,<3.0"
-group.dev.dependencies.tox = ">=4.65,<5"
 
 [tool.black]
 line-length = 88
