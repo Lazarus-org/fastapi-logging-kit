@@ -43,9 +43,9 @@ classifiers = [
 dependencies = [
   "anyio>=3.4,<5",
   "fastapi>=0.100,<1",
-  "jinja2>=3.1,<4",
+  "jinja2>=3.1.6,<4",
   "starlette>=0.27,<2",
-  "typer>=0.12,<1",
+  "typer>=0.27.3,<1",
 ]
 optional-dependencies.sqlalchemy = [ "sqlalchemy>=2.0.52,<3" ]
 urls."Source Code" = "https://github.com/lazarus-org/fastapi-logging-kit"
@@ -89,7 +89,7 @@ quality = [
   "mypy>=1.11.1,<2",
   "pre-commit>=4.4,<5",
   "pylint>=3.2.6,<4",
-  "tox>=4.65,<5",
+  "tox>=4.67.4,<5",
 ]
 
 [tool.poetry]
