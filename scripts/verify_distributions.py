@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import argparse
+import ast
 import configparser
 import email
 import re
@@ -38,7 +40,25 @@ def load_project() -> dict[str, Any]:
     project_file = ROOT / "pyproject.toml"
     if not project_file.is_file():
         fail(f"project metadata file is missing: {project_file}")
-    return tomllib.loads(project_file.read_text(encoding="utf-8"))["project"]
+    metadata = tomllib.loads(project_file.read_text(encoding="utf-8"))
+    project = metadata["project"]
+    module = ast.parse(
+        (ROOT / "fastapi_logging_kit/__init__.py").read_text(encoding="utf-8")
+    )
+    versions = [
+        ast.literal_eval(node.value)
+        for node in module.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "__version__"
+            for target in node.targets
+        )
+    ]
+    if versions != [project["version"]]:
+        fail("package __version__ does not match pyproject.toml")
+    if metadata["tool"]["commitizen"]["version"] != project["version"]:
+        fail("Commitizen version does not match pyproject.toml")
+    return project
 
 
 def verify_wheel(path: Path, project: dict[str, Any]) -> None:
@@ -79,8 +99,7 @@ def verify_wheel(path: Path, project: dict[str, Any]) -> None:
         for dependency in project.get("dependencies", []):
             expected_dependency = requirement_name(dependency)
             if not any(
-                requirement_name(value) == expected_dependency
-                for value in requirements
+                requirement_name(value) == expected_dependency for value in requirements
             ):
                 fail(f"wheel is missing runtime dependency metadata for {dependency}")
 
@@ -130,7 +149,9 @@ def verify_wheel(path: Path, project: dict[str, Any]) -> None:
             fail("wheel must not contain the internal test suite")
         if any(name.startswith("docs/") for name in names):
             fail("wheel must not contain the documentation source tree")
-        if any("__pycache__" in name or name.endswith((".pyc", ".pyo")) for name in names):
+        if any(
+            "__pycache__" in name or name.endswith((".pyc", ".pyo")) for name in names
+        ):
             fail("wheel must not contain Python bytecode or cache directories")
 
         entry_points_paths = [
@@ -139,9 +160,7 @@ def verify_wheel(path: Path, project: dict[str, Any]) -> None:
         if len(entry_points_paths) != 1:
             fail("wheel must contain exactly one entry_points.txt file")
         entry_points = configparser.ConfigParser()
-        entry_points.read_string(
-            archive.read(entry_points_paths[0]).decode("utf-8")
-        )
+        entry_points.read_string(archive.read(entry_points_paths[0]).decode("utf-8"))
         expected_entry_point = "fastapi_logging_kit.commands.cli:main"
         if (
             not entry_points.has_option("console_scripts", "fastapi-logging-kit")
@@ -155,8 +174,20 @@ def verify_sdist(path: Path) -> None:
     """Ensure the source distribution contains the files needed to maintain it."""
     with tarfile.open(path, "r:gz") as archive:
         names = {member.name for member in archive.getmembers() if member.isfile()}
+    if any(
+        "/docs/_build/" in name
+        or "__pycache__" in name
+        or name.endswith((".pyc", ".pyo"))
+        for name in names
+    ):
+        fail("sdist must not contain generated documentation or Python caches")
 
     required_suffixes = {
+        "/AUTHORS.md",
+        "/CODE_OF_CONDUCT.md",
+        "/CONTRIBUTING.md",
+        "/CONTRIBUTORS.md",
+        "/SECURITY.md",
         "/CHANGELOG.md",
         "/LICENCE",
         "/README.md",
@@ -164,6 +195,8 @@ def verify_sdist(path: Path) -> None:
         "/tox.ini",
         "/docs/index.rst",
         "/docs/requirements.txt",
+        "/docs/extensibility.rst",
+        "/scripts/verify_distributions.py",
         "/packages/requirements.txt",
         "/packages/requirements-dev.txt",
         "/fastapi_logging_kit/tests/test_public_api.py",
@@ -189,12 +222,19 @@ def verify_sdist(path: Path) -> None:
 
 def main() -> None:
     """Verify exactly one wheel and one source distribution."""
-    dist = Path(sys.argv[1] if len(sys.argv) > 1 else "dist").resolve()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("dist", nargs="?", type=Path, default=Path("dist"))
+    parser.add_argument("--tag", help="Release tag; must equal v<project version>")
+    args = parser.parse_args()
+    project = load_project()
+    if args.tag is not None and args.tag != f"v{project['version']}":
+        fail(f"release tag {args.tag!r} must equal v{project['version']}")
+    dist = args.dist.resolve()
     wheels = sorted(dist.glob("*.whl"))
     sdists = sorted(dist.glob("*.tar.gz"))
     if len(wheels) != 1 or len(sdists) != 1:
         fail("expected exactly one wheel and one .tar.gz source distribution")
-    verify_wheel(wheels[0], load_project())
+    verify_wheel(wheels[0], project)
     verify_sdist(sdists[0])
     print("Distribution contents and metadata verified.")
 

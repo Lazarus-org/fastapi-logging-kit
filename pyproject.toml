@@ -1,13 +1,21 @@
 [build-system]
 build-backend = "poetry.core.masonry.api"
-requires = [ "poetry-core>=2.2.0,<3" ]
+requires = [ "poetry-core>=2.2,<3" ]
 
 [project]
 name = "fastapi-logging-kit"
 version = "1.0.0"
 description = "Extensible structured logging, request diagnostics, and observability utilities for FastAPI and ASGI applications"
 readme = "README.md"
-keywords = [ "fastapi", "fastapi logging", "asgi", "starlette", "structured logging", "request logging", "observability" ]
+keywords = [
+  "asgi",
+  "fastapi",
+  "fastapi logging",
+  "observability",
+  "request logging",
+  "starlette",
+  "structured logging"
+]
 license = "MIT"
 license-files = [ "LICENCE" ]
 authors = [
@@ -15,13 +23,6 @@ authors = [
   { name = "MEHRSHAD-MIRSHEKARY", email = "mehrshad_mirshekary@email.com" },
 ]
 requires-python = ">=3.11,<3.16"
-dependencies = [
-  "anyio>=3.4.0,<5",
-  "fastapi>=0.100,<1.0",
-  "starlette>=0.27,<1.0",
-  "jinja2>=3.1.0,<4.0",
-  "typer>=0.12,<1.0",
-]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Environment :: Web Environment",
@@ -40,36 +41,47 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: System :: Logging",
 ]
-
-[project.optional-dependencies]
-sqlalchemy = ["SQLAlchemy>=2.0.52,<3.0"]
-
-[project.scripts]
-fastapi-logging-kit = "fastapi_logging_kit.commands.cli:main"
-
-[project.urls]
-"Source Code" = "https://github.com/lazarus-org/fastapi-logging-kit"
-Changelog = "https://github.com/lazarus-org/fastapi-logging-kit/blob/main/CHANGELOG.md"
-Documentation = "https://fastapi-logging-kit.readthedocs.io"
-Issues = "https://github.com/lazarus-org/fastapi-logging-kit/issues"
+dependencies = [
+  "anyio>=3.4,<5",
+  "fastapi>=0.100,<1",
+  "jinja2>=3.1,<4",
+  "starlette>=0.27,<1",
+  "typer>=0.12,<1",
+]
+optional-dependencies.sqlalchemy = [ "sqlalchemy>=2.0.52,<3" ]
+urls."Source Code" = "https://github.com/lazarus-org/fastapi-logging-kit"
+urls.Changelog = "https://github.com/lazarus-org/fastapi-logging-kit/blob/main/CHANGELOG.md"
+urls.Documentation = "https://fastapi-logging-kit.readthedocs.io"
+urls.Issues = "https://github.com/lazarus-org/fastapi-logging-kit/issues"
+scripts.fastapi-logging-kit = "fastapi_logging_kit.commands.cli:main"
 
 [tool.poetry]
 packages = [
   { include = "fastapi_logging_kit" },
 ]
 include = [
+  { path = "AUTHORS.md", format = "sdist" },
+  { path = "CODE_OF_CONDUCT.md", format = "sdist" },
+  { path = "CONTRIBUTING.md", format = "sdist" },
+  { path = "CONTRIBUTORS.md", format = "sdist" },
+  { path = "SECURITY.md", format = "sdist" },
   { path = "CHANGELOG.md", format = "sdist" },
-  { path = "docs", format = "sdist" },
-  { path = "fastapi_logging_kit/py.typed", format = ["sdist", "wheel"] },
-  { path = "fastapi_logging_kit/static", format = ["sdist", "wheel"] },
-  { path = "fastapi_logging_kit/templates", format = ["sdist", "wheel"] },
+  { path = "docs/*.rst", format = "sdist" },
+  { path = "docs/*.py", format = "sdist" },
+  { path = "docs/requirements.txt", format = "sdist" },
+  { path = "docs/Makefile", format = "sdist" },
+  { path = "docs/make.bat", format = "sdist" },
+  { path = "fastapi_logging_kit/py.typed", format = [ "sdist", "wheel" ] },
+  { path = "fastapi_logging_kit/static", format = [ "sdist", "wheel" ] },
+  { path = "fastapi_logging_kit/templates", format = [ "sdist", "wheel" ] },
   { path = "fastapi_logging_kit/tests", format = "sdist" },
   { path = "packages", format = "sdist" },
+  { path = "scripts", format = "sdist" },
   { path = "tox.ini", format = "sdist" },
   { path = ".readthedocs.yaml", format = "sdist" },
 ]
 exclude = [
-  { path = "fastapi_logging_kit/tests/**", format = "wheel" },
+  "fastapi_logging_kit/tests/**",
 ]
 group.dev.dependencies.bandit = { extras = [ "toml" ], version = ">=1.9.4,<2" }
 group.dev.dependencies.black = ">=26.5.1,<27"
@@ -85,9 +97,9 @@ group.dev.dependencies.pytest = ">=9.1,<10"
 group.dev.dependencies.pytest-asyncio = ">=1.4.1,<2"
 group.dev.dependencies.pytest-cov = ">=7.1,<8"
 group.dev.dependencies.python-semantic-release = "^9.8.8"
-group.dev.dependencies.sqlalchemy = ">=2.0.52,<3.0"
 group.dev.dependencies.sphinx = ">=8.2,<10"
 group.dev.dependencies.sphinx-rtd-theme = ">=3.1,<4"
+group.dev.dependencies.sqlalchemy = ">=2.0.52,<3.0"
 group.dev.dependencies.tox = ">=4.65,<5"
 
 [tool.black]
@@ -195,12 +207,10 @@ ignore_missing_imports = true
 disallow_untyped_calls = true
 disallow_untyped_defs = true
 
-[tool.pytest.ini_options]
-python_files = [ "test_*.py", "tests.py" ]
-addopts = "--cov --cov-report=term-missing --cov-report=html --cov-fail-under=100"
-asyncio_default_fixture_loop_scope = "function"
-asyncio_mode = "auto"
-markers = [
+[tool.pytest]
+ini_options.python_files = [ "test_*.py", "tests.py" ]
+ini_options.addopts = "--cov --cov-report=term-missing --cov-report=html --cov-fail-under=100"
+ini_options.markers = [
   "base_formatter: Tests for the base class of formatters.",
   "base_middleware: Tests for the base class of middleware components.",
   "colored_formatter: Tests for a formatter that adds color coding to log messages.",
@@ -248,6 +258,8 @@ markers = [
   "validators_rotation: Tests for validators that check rotation configuration inputs.",
   "xml_formatter: Tests for the formatter that structures logs as XML documents.",
 ]
+ini_options.asyncio_default_fixture_loop_scope = "function"
+ini_options.asyncio_mode = "auto"
 
 [tool.coverage]
 run.omit = [
@@ -259,9 +271,9 @@ report.exclude_lines = [
   "if __name__ == .__main__.:",
   "if 0:",
   "if self\\.debug",
+  "if TYPE_CHECKING:",
   "pragma: no cover",
   "raise AssertionError",
-  "if TYPE_CHECKING:",
 ]
 
 [tool.commitizen]
