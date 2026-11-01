@@ -36,7 +36,7 @@ Setting Up Your Environment
 
    .. code-block:: bash
 
-       poetry install
+       poetry install --extras sqlalchemy
 
 4. **Create a Feature Branch:**
 
@@ -200,3 +200,52 @@ Here are some additional resources that might be helpful:
 ----
 
 Thank you for your interest in contributing to `fastapi_logging_kit`! We look forward to your contributions.
+
+Repository policies and releases
+--------------------------------
+
+The repository's `contribution guide <https://github.com/lazarus-org/fastapi-logging-kit/blob/main/CONTRIBUTING.md>`_
+includes pip/venv setup and maintainer release instructions. The
+`Code of Conduct <https://github.com/lazarus-org/fastapi-logging-kit/blob/main/CODE_OF_CONDUCT.md>`_
+sets expectations for participation. Report vulnerabilities privately using
+`SECURITY.md <https://github.com/lazarus-org/fastapi-logging-kit/blob/main/SECURITY.md>`_.
+
+Release builds check the version tag, wheel metadata and source contents, then
+run the reusable CI workflow. Publishing requires the repository's
+``PYPI_PUBLISH_ENABLED`` variable, a configured PyPI Trusted Publisher, and the
+``pypi`` GitHub environment. Required reviewers must be configured separately
+if manual approval is wanted.
+
+Automatic version increments and publishing
+-------------------------------------------
+
+Commitizen can update the version declarations and generate release notes:
+
+.. code-block:: bash
+
+   poetry run cz bump --dry-run
+   poetry run cz bump --changelog --check-consistency
+
+The first command previews the version. The second updates the configured
+version files, writes the changelog, and creates a local release commit and tag.
+Run it only as a maintainer release step from a clean, reviewed branch.
+``version_files`` keeps ``[project].version``, ``[tool.commitizen].version``, and
+``fastapi_logging_kit.__version__`` aligned.
+
+For a separate changelog commit, generate it before creating the release tag:
+
+.. code-block:: bash
+
+   poetry run cz changelog --incremental --unreleased-version v1.1.0
+   git add CHANGELOG.md
+   git commit -m "docs(changelog): prepare release 1.1.0"
+   poetry run cz bump --check-consistency
+
+Replace the example version with the version selected by the dry run. Choose
+this flow or the combined ``--changelog`` flow for each release.
+
+The complete `publishing guide <https://github.com/lazarus-org/fastapi-logging-kit/blob/main/CONTRIBUTING.md#publishing-guide>`_
+covers Poetry builds, artifact validation, pushing the release tag, GitHub
+Trusted Publishing, TestPyPI, and manual Poetry publishing. The same guide
+retains dependency export instructions and explains how to preserve the
+canonical requirement manifests while generating resolved snapshots.
