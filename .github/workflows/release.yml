@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-and-build:
+    name: Validate tag and build distributions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install build tools
+        run: python -m pip install build twine
+      - name: Build distributions
+        run: python -m build --sdist --wheel
+      - name: Validate metadata and package files
+        run: |
+          python -m twine check dist/*
+          python scripts/verify_distributions.py dist
+      - name: Verify release tag matches package version
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python scripts/verify_distributions.py dist --tag "$RELEASE_TAG"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-distributions
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  test-release:
+    name: Full release validation
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: Publish to PyPI
+    if: startsWith(github.ref, 'refs/tags/') && vars.PYPI_PUBLISH_ENABLED == 'true'
+    needs: [verify-and-build, test-release]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-distributions
+          path: dist
+      - name: Publish using PyPI Trusted Publisher
+        uses: pypa/gh-action-pypi-publish@release/v1
