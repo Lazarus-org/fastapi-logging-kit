@@ -15,4 +15,4 @@ python-semantic-release>=9.8.8,<10
 sphinx>=8.2,<10
 sphinx-rtd-theme>=3.1,<4
 sqlalchemy>=2.0.52,<3.0
-tox>=4.65,<5
+tox>=4.67.4,<5
