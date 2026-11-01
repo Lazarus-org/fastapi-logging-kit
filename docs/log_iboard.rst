@@ -29,7 +29,6 @@ Setup Instructions
       from fastapi import FastAPI
       from fastapi_logging_kit.routers import set_permission_check
 
-
       app = FastAPI()
 
 

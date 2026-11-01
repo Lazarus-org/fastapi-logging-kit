@@ -193,7 +193,7 @@ setup_logging(
 )
 ```
 
-Every option can also be supplied through the environment, using the `FASTAPI_LOGGING_` prefix. Values are parsed as JSON, falling back to a plain string:
+Legacy flat-key options can also be supplied through the environment, using the `FASTAPI_LOGGING_` prefix. Pass structured `LOGGING`, `COMPONENTS`, and `REQUEST_LOGGING` settings explicitly. Values are parsed as JSON, falling back to a plain string:
 
 ```shell
 export FASTAPI_LOGGING_LOG_DIR=/var/log/myapp
@@ -352,21 +352,21 @@ from fastapi_logging_kit import RequestLogMiddleware, setup_logging
 
 app = FastAPI()
 setup_logging(app, add_middleware=False)
-app.add_middleware(RequestLogMiddleware)
+app.add_middleware(RequestLogMiddleware, config={})
 ```
 
 #### Key Features
 
-- **Request/response logging**: logs the method, path and request ID when a request starts, and the user, status code, content type and elapsed time when it finishes.
-- **Request IDs**: reuses an incoming `X-Request-ID` header when present, otherwise generates a UUID.
-- **Context propagation**: binds `request_id`, `ip_address` and `user_agent` to the context variables, so every log record emitted while handling the request carries them automatically.
+- **Request/response logging**: structured setup logs completion by default. Enable `REQUEST_LOGGING.LOG_REQUEST_STARTED` for starting events; completion includes user, status code, content type and elapsed time.
+- **Request IDs**: accepts a single valid, bounded `X-Request-ID` value or generates a UUID, and returns it in the response header.
+- **Context propagation**: binds `request_id`, `ip_address` and optional `user_agent`. Add `ContextVarFilter` to an output handler and `%(context)s` to its formatter to render them.
 - **Streaming support**: tracks streaming lifecycle and emits `Streaming started` and `Streaming finished` records only when `REQUEST_LOGGING.LOG_STREAMING_EVENTS` is enabled.
 - **Cancellation handling**: logs a warning and releases the bound context when a client disconnects mid-request.
 - **SQL query logging**: includes queries recorded during the request when `REQUEST_LOGGING.LOG_SQL_QUERIES` is enabled. SQL diagnostics are disabled by default because SQL statements may contain sensitive literal values.
 
 The middleware is pure ASGI, so it forwards websocket and lifespan traffic untouched. Query parameters, request bodies, error-response bodies, SQL diagnostics and additional streaming lifecycle events are independently opt-in.
 
-Example output:
+Example output with starting events and context rendering enabled:
 
 ```
 INFO | 2026-01-05 12:00:00 | request_middleware | REQUEST STARTED: method=GET path=/api/items request_id=a3f1...
@@ -386,7 +386,7 @@ FastAPI has no built-in authentication, so the middleware reads the user from `s
 
 #### Context Variables Usage
 
-Because the request context is bound to context variables, your own log calls inherit it without you passing anything:
+Your log calls can render request context when their output handler has `ContextVarFilter`; default setup does not inject it into arbitrary host handlers:
 
 ```python
 import logging
@@ -396,7 +396,7 @@ logger = logging.getLogger(__name__)
 
 @app.get("/items")
 async def list_items():
-    logger.info("Listing items")  # automatically carries request_id, ip_address, user_agent
+    logger.info("Listing items")  # A handler with ContextVarFilter can render request context.
     return []
 ```
 
@@ -740,7 +740,7 @@ Here's a breakdown of the available configuration options:
 -------
 
 - **Type**: `dict`
-- **Description**: The SMTP settings used to deliver notifications. In `django_logging` these were top-level Django settings; here they are namespaced under this key. See [Required Email Settings](#required-email-settings).
+- **Description**: The SMTP settings used to deliver notifications, grouped under the `EMAIL` configuration key. See [Required Email Settings](#required-email-settings).
 - **Default**: `{}`
 
 
@@ -981,7 +981,7 @@ export FASTAPI_LOGGING_EMAIL='{"EMAIL_HOST":"smtp.example.com","EMAIL_PORT":587,
 
 ## Migrating from django_logging
 
-`fastapi_logging_kit` keeps the same configuration keys, formats and behaviour. What changes is how the package attaches to your application:
+`fastapi_logging_kit` retains the core logging features and legacy keys, with deliberate ASGI, serialization, and default-setup differences:
 
 | django_logging | fastapi_logging_kit |
 | --- | --- |
@@ -991,13 +991,13 @@ export FASTAPI_LOGGING_EMAIL='{"EMAIL_HOST":"smtp.example.com","EMAIL_PORT":587,
 | `settings.DEBUG` | The `DEBUG` configuration key |
 | `MIDDLEWARE` list entries | Installed by `setup_logging`, or `app.add_middleware(...)` |
 | `python manage.py send_logs` | `fastapi-logging-kit send-logs` |
-| Django system checks abort startup | Check failures are logged as warnings; the app still boots |
+| Django system checks abort startup | Legacy checks warn; structured validation raises before installation |
 | `connection.queries` | `instrument_sqlalchemy(engine)` or `record_query(...)` |
 | `request.user` | `scope["user"]` |
 | LogiBoard superuser check | A replaceable predicate via `set_permission_check` |
 | `django.core.cache` | An in-process cache, replaceable via `set_cache` |
 
-The formatters, filters, context variable manager, rotation handling and format options are unchanged.
+Format choices, level filters, context operations, and rotation remain available. Structured serialization now preserves original messages, redacts named fields, and bounds event size; output is not byte-for-byte identical. The no-config setup preserves host handlers and does not create per-level files.
 
 ## Explicit `FASTAPI_LOGGING` configuration
 
@@ -1098,3 +1098,12 @@ application begins serving requests.
 Request middleware settings are copied into each FastAPI application, but
 Python's logging registry and logger/handler graph are process-wide. Separate
 FastAPI applications in one process do not receive isolated logging registries.
+
+
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, validation, and release steps;
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for participation guidelines; and
+[SECURITY.md](SECURITY.md) for private vulnerability reporting.
+[AUTHORS.md](AUTHORS.md) and [CONTRIBUTORS.md](CONTRIBUTORS.md) record authorship
+and upstream credits.

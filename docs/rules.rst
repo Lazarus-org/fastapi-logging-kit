@@ -56,7 +56,9 @@ Available Roles
 
       import logging
 
-      from fastapi_logging_kit.utils.log_email_notifier.log_and_notify import log_and_notify_admin
+      from fastapi_logging_kit.utils.log_email_notifier.log_and_notify import (
+          log_and_notify_admin,
+      )
 
       logger = logging.getLogger(__name__)
 

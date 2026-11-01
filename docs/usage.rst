@@ -45,7 +45,10 @@ Configuring
        },
    )
 
-Every option can also be supplied through the environment, using the ``FASTAPI_LOGGING_`` prefix. Values are parsed as JSON, falling back to a plain string:
+Legacy flat-key options can also be supplied through the environment, using
+the ``FASTAPI_LOGGING_`` prefix. Structured ``LOGGING``, ``COMPONENTS``, and
+``REQUEST_LOGGING`` settings must be passed explicitly to ``setup_logging``.
+Legacy environment values are parsed as JSON, falling back to a plain string:
 
 .. code-block:: shell
 
@@ -65,7 +68,9 @@ An explicit mapping passed to ``setup_logging`` takes priority over the environm
 
 .. note::
 
-   Configuration check failures are logged as warnings; unlike Django's system checks they never abort startup. Your application still boots, falling back to the packaged defaults for the invalid options.
+   Legacy checks report warnings; they do not guarantee that invalid values
+   fall back to defaults. Handler construction may still fail. Structured
+   settings raise configuration errors before installation.
 
 For a full breakdown of every option, refer to the :doc:`Settings <settings>`.
 
@@ -106,7 +111,9 @@ Log and Notify Utility
 
       import logging
 
-      from fastapi_logging_kit.utils.log_email_notifier.log_and_notify import log_and_notify_admin
+      from fastapi_logging_kit.utils.log_email_notifier.log_and_notify import (
+          log_and_notify_admin,
+      )
 
       logger = logging.getLogger(__name__)
 
@@ -212,45 +219,32 @@ To install it yourself — for example to control the middleware ordering — ad
 
    app = FastAPI()
    setup_logging(app, add_middleware=False)
-   app.add_middleware(RequestLogMiddleware)
+   app.add_middleware(RequestLogMiddleware, config={})
 
 Key Features
 ^^^^^^^^^^^^
 
-1. **Request/response logging**:
-   - Logs the following details at the start of each request:
-
-     - Request method
-     - Request path
-     - Query parameters
-     - Referrer (if available)
-
-   - And the following details once the request has been processed:
-
-     - User (or ``Anonymous`` if not authenticated)
-     - HTTP status code
-     - Content type
-     - Time taken to process the request
-     - Optionally the SQL queries recorded during the request
-
-2. **Request IDs**:
-   - Reuses an incoming ``X-Request-ID`` header when present, otherwise generates a UUID. The request ID is included in logs and can help with tracing specific requests.
-
-3. **Context propagation**:
-   - Binds ``request_id``, ``ip_address`` and ``user_agent`` to the context variables, so every log record emitted while handling the request carries them automatically.
-
-4. **Streaming support**:
-   - Emits ``Streaming started`` and ``Streaming finished`` records around streaming responses.
-
-5. **Cancellation handling**:
-   - Logs a warning and releases the bound context when a client disconnects mid-request.
-
-6. **SQL query logging**:
-   - Includes the queries a request issued when ``LOG_SQL_QUERIES_ENABLE`` is on. For how queries are collected, see `Tracking queries`_.
+* **Request/response logging:** structured defaults emit one completion record.
+  Set ``REQUEST_LOGGING.LOG_REQUEST_STARTED=True`` for an additional starting
+  event. Records include method, path, status, duration, content type and user
+  when available. Query parameters require ``QUERY_PARAMS_ENABLED=True``.
+* **Request IDs:** accepts a single valid, bounded ``X-Request-ID`` value or
+  generates a UUID. The ID is returned in the response header as well.
+* **Context propagation:** binds ``request_id``, ``ip_address`` and optional
+  ``user_agent``. Attach ``ContextVarFilter`` to a handler and use
+  ``%(context)s`` in its formatter to render these values in your own records.
+* **Streaming support:** keeps context through the final response body.
+  Additional stream records require ``LOG_STREAMING_EVENTS=True`` under
+  ``REQUEST_LOGGING``. Direct legacy middleware enables them by default.
+* **Cancellation handling:** reports cancellations and releases context.
+* **SQL query logging:** enable ``REQUEST_LOGGING.LOG_SQL_QUERIES`` for
+  structured setup or ``LOG_SQL_QUERIES_ENABLE`` for legacy setup. Capture
+  has byte and count limits. See `Tracking queries`_ for instrumentation.
 
 The middleware is pure ASGI, so it forwards websocket and lifespan traffic untouched.
 
-Example log output:
+Example log output with starting events, query diagnostics, and a context
+filter explicitly enabled:
 
 .. code-block:: text
 
@@ -282,7 +276,8 @@ We use context variables in ``RequestLogMiddleware`` to store the following info
 - **ip_address**: The client's IP address.
 - **user_agent**: The client's user agent string.
 
-Because the request context is bound to context variables, your own log calls inherit it without you passing anything:
+Request context is available to your own log calls through ``ContextVarFilter``.
+It is not automatically added to arbitrary host handlers by the default setup:
 
 .. code-block:: python
 
@@ -293,7 +288,7 @@ Because the request context is bound to context variables, your own log calls in
 
    @app.get("/items")
    async def list_items():
-       # automatically carries request_id, ip_address, user_agent
+       # A handler with ContextVarFilter can render the request context.
        logger.info("Listing items")
        return []
 
@@ -316,7 +311,7 @@ The "last run" timestamp is kept in a small in-process cache. If you run several
 Context Variable Management
 ---------------------------
 
-``fastapi_logging_kit`` includes a powerful ``ContextVarManager`` class, allowing you to manage context variables dynamically within your logging system. These variables are bound to the current context and automatically included in your log entries via the ``%(context)s`` placeholder in the log format.
+``fastapi_logging_kit`` includes a powerful ``ContextVarManager`` class, allowing you to manage context variables dynamically within your logging system. These variables are bound to the current context. A handler with ``ContextVarFilter`` can render them through the ``%(context)s`` placeholder.
 
 Binding and Unbinding Context Variables
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -706,7 +701,9 @@ Use ``LOG_ROTATION_OVERRIDES`` to give individual log levels a different strateg
 Migrating from django_logging
 -----------------------------
 
-``fastapi_logging_kit`` keeps the same configuration keys, formats and behaviour as `django_logging`. What changes is how the package attaches to your application:
+``fastapi_logging_kit`` retains Django Logging's core logging features and
+legacy configuration keys while adapting application setup, authentication,
+SQL capture, and defaults for ASGI.
 
 .. list-table::
    :header-rows: 1
@@ -727,7 +724,7 @@ Migrating from django_logging
    * - ``python manage.py send_logs``
      - ``fastapi-logging-kit send-logs``
    * - Django system checks abort startup
-     - Check failures are logged as warnings; the app still boots
+     - Legacy checks warn; structured validation raises before installation
    * - ``connection.queries``
      - ``instrument_sqlalchemy(engine)`` or ``record_query(...)``
    * - ``request.user``
@@ -737,4 +734,7 @@ Migrating from django_logging
    * - ``django.core.cache``
      - An in-process cache, replaceable via ``set_cache``
 
-The formatters, filters, context variable manager, rotation handling and format options are unchanged.
+Format choices, level filters, context operations, and rotation remain
+available. Structured serialization now preserves original messages, redacts
+named fields, and limits event size; output is not byte-for-byte compatible.
+The no-config setup preserves host handlers and does not create per-level files.

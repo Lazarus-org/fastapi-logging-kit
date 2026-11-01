@@ -1,26 +1,41 @@
 Component Extensibility
 =======================
 
-FastAPI Logging Kit builds its default handlers, formatters and filters from a set of
-package presets. Applications can extend those presets through the
-``FASTAPI_LOGGING["COMPONENTS"]`` mapping without editing package internals.
-
-The extension compiler validates names and references before it creates or
-attaches handlers. A component is never silently overwritten: use ``replace``
-for an intentional replacement and ``disable`` to remove a preset.
+Pass the structured ``FASTAPI_LOGGING`` mapping explicitly to
+``setup_logging(app, config=FASTAPI_LOGGING)``. Its public top-level keys are
+``ENABLED``, ``LOGGING``, ``COMPONENTS``, and ``REQUEST_LOGGING``. A settings
+module or environment variable named ``FASTAPI_LOGGING`` is not discovered
+automatically.
 
 Adding components
 -----------------
 
+The no-config structured preset contains a ``console`` formatter, a ``console``
+handler, and no preset filters or per-level file handlers. Component names must
+be unique. Merely declaring a handler does not activate it; route it through a
+named logger, ``package_handlers``, or ``root_handlers``.
+
 .. code-block:: python
 
+   from pathlib import Path
+   from fastapi import FastAPI
+   from fastapi_logging_kit import setup_logging
+
+   Path("logs").mkdir(exist_ok=True)
+   app = FastAPI()
    FASTAPI_LOGGING = {
        "COMPONENTS": {
            "formatters": {
-               "audit": {"()": "myproject.logging.AuditFormatter"},
+               "audit": {
+                   "()": "fastapi_logging_kit.formatters.JSONFormatter",
+                   "fmt": "%(levelname)s %(message)s %(context)s",
+                   "structured_logging": {"EXCEPTION_MODE": "type"},
+               },
            },
            "filters": {
-               "audit_filter": {"()": "myproject.logging.AuditFilter"},
+               "request_context": {
+                   "()": "fastapi_logging_kit.filters.ContextVarFilter",
+               },
            },
            "handlers": {
                "audit_file": {
@@ -28,7 +43,7 @@ Adding components
                    "filename": "logs/audit.log",
                    "level": "INFO",
                    "formatter": "audit",
-                   "filters": ["audit_filter"],
+                   "filters": ["request_context"],
                },
            },
            "loggers": {
@@ -40,108 +55,83 @@ Adding components
            },
        },
    }
-
    setup_logging(app, config=FASTAPI_LOGGING)
 
-Component definitions use the standard ``logging.config.dictConfig`` schema.
-A handler must define exactly one of ``class`` or ``()``. The latter may be a
-callable or a dotted import path. Formatters and filters may likewise use the
-standard ``dictConfig`` component syntax.
+The definitions follow Python's ``logging.config.dictConfig`` syntax. A handler
+requires exactly one of ``class`` or ``()``; factories may be callables or dotted
+import paths. Applications create file-handler directories themselves.
 
-Routing package handlers and root handlers
-------------------------------------------
+Routing to package and root loggers
+-----------------------------------
 
-``package_handlers`` attaches named handlers to the ``fastapi_logging_kit`` logger.
-``root_handlers`` attaches named handlers to the root logger in ``additive``
-and ``replace_root`` modes. ``isolated`` mode deliberately leaves root alone.
-These are explicit routing choices; merely defining a handler does not
-activate it.
+``package_handlers`` attaches handlers to the ``fastapi_logging_kit`` logger.
+``root_handlers`` adds handlers to root while retaining existing host handlers
+in the default structured setup. For example, add an audit handler to root:
 
 .. code-block:: python
 
-   FASTAPI_LOGGING = {
-       "COMPONENTS": {
-           "handlers": {
-               "audit_console": {"class": "logging.StreamHandler"},
-           },
-           "package_handlers": ["audit_console"],
-       },
-   }
+   FASTAPI_LOGGING["COMPONENTS"]["root_handlers"] = ["audit_file"]
 
-In the default ``additive`` setup mode, FastAPI Logging Kit preserves existing root
-handlers. Its own console handler remains on the ``fastapi_logging_kit`` namespace,
-while package file/email handlers are added to root. This prevents duplicate
-writes and allows host handlers (including test capture handlers) to continue
-receiving package log records.
-
-In ``isolated`` mode, package handlers are routed to the ``fastapi_logging_kit``
-namespace without attaching them to root. The ``replace_root`` mode applies
-the generated configuration through Python's global ``dictConfig`` behavior
-and is retained for compatibility with callers that explicitly want root
-replacement.
+Choose this routing before the first ``setup_logging`` call. Request middleware
+configuration is copied per application, but Python's logging registry remains
+process-wide. Do not attach the same output handler at multiple points in a
+propagating logger chain unless duplicate output is intended.
 
 Replacing or disabling presets
 ------------------------------
 
-Use ``replace`` to replace an existing preset by name:
+Use ``replace`` to change a component that already exists, and ``disable`` to
+remove it. The default structured preset does not contain ``info`` or ``debug``
+handlers; those belong to the legacy per-level configuration.
 
 .. code-block:: python
 
-   FASTAPI_LOGGING = {
-       "COMPONENTS": {
-           "replace": {
-               "handlers": {
-                   "info": {
-                       "class": "logging.handlers.RotatingFileHandler",
-                       "filename": "logs/info.log",
-                       "maxBytes": 10_485_760,
-                       "backupCount": 5,
-                       "formatter": "info",
-                       "level": "INFO",
-                       "filters": ["info", "context_var_filter"],
+   app = FastAPI()
+   setup_logging(
+       app,
+       config={
+           "COMPONENTS": {
+               "replace": {
+                   "formatters": {
+                       "console": {
+                           "()": "fastapi_logging_kit.formatters.JSONFormatter",
+                           "fmt": "%(levelname)s %(message)s",
+                       },
                    },
                },
            },
-           "disable": {"handlers": ["debug"]},
        },
-   }
+   )
 
-A replacement must target an existing component. Disabled handlers are removed from preset root/logger references. Disabled
-filters are removed from handler/logger filter lists, and disabled formatters
-are detached from handlers, so the compiled configuration does not retain
-dangling references.
+``disable`` accepts lists of existing component names, for example
+``{"handlers": ["console"]}``. Disabled handlers are removed from routing;
+references to disabled filters and formatters are removed as well. Disabling
+the only output handler can leave the package without configured output.
 
-Validation and activation safety
---------------------------------
+Validation and activation
+-------------------------
 
-The component compiler rejects:
+The compiler rejects missing references, duplicate names, replacement of
+unknown components, and invalid routes before activation. Only components
+reachable from selected routing are instantiated; an unattached file handler
+does not open a file. Handler dependencies such as ``MemoryHandler.target`` are
+constructed in dependency order. Activation of the default additive component
+graph restores the previous logger attachments if construction or attachment
+fails.
 
-* duplicate or empty names;
-* additions that collide with an existing name;
-* replacements or removals for names that do not exist;
-* references to missing handlers, formatters or filters;
-* invalid root/package handler routes;
-* attempts to replace the package-managed ``fastapi_logging_kit`` or ``root`` logger
-  through the named ``loggers`` extension.
+Configure before serving requests. Repeating the same structured setup on one
+application is idempotent; changing its configuration after setup raises an
+error. The public ``setup_logging`` function does not accept a ``mode`` keyword.
 
-Only components reachable from active routing are instantiated. For example,
-a declared but unattached file handler does not open a file. Handler-to-handler
-dependencies such as ``MemoryHandler.target`` are constructed in dependency
-order; unresolved references and cycles fail before the active logger graph is
-changed.
+Using explicit LOGGING
+----------------------
 
-Using a custom LOGGING mapping
-------------------------------
+A nonempty ``LOGGING`` mapping selects Python's process-wide ``dictConfig``
+replacement semantics instead of additive component activation. Existing
+handlers may be replaced; setting ``disable_existing_loggers=False`` does not
+preserve handlers by itself. ``COMPONENTS`` may extend this supplied mapping,
+using its actual component names. Incremental dictConfig is not supported by
+the structured contract.
 
-The ``LOGGING`` section accepts a standard Python ``dictConfig`` mapping. When
-provided, that mapping is applied as an explicit process-wide logging
-configuration. It is not merged additively with the host's existing logger
-graph. Set ``disable_existing_loggers`` to ``False`` when the application
-expects unrelated existing loggers to remain enabled.
-
-``COMPONENTS`` can extend or replace named components in that mapping. For a
-custom ``LOGGING`` mapping, ``package_handlers`` is applied to the
-``fastapi_logging_kit`` named logger and ``root_handlers`` to root.
-
-The custom mapping and its extension are copied before compilation; callers'
-input dictionaries are not mutated.
+Input mappings are copied. Application-specific middleware settings do not
+isolate the global logging graph between multiple FastAPI applications.

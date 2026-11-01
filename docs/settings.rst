@@ -25,7 +25,10 @@ Environment variables are parsed as JSON, falling back to a plain string:
 
 .. note::
 
-   Configuration check failures are logged as warnings — they do **not** abort startup the way Django system checks do. Your application still boots.
+   Legacy check failures are reported as warnings, but invalid values are not
+   guaranteed to be replaced with defaults; handler construction or activation
+   may still fail. The structured contract rejects invalid settings before
+   installation. Correct configuration errors before serving requests.
 
 Structured logging formatters
 -----------------------------
@@ -45,30 +48,35 @@ package.
 
 .. code-block:: python
 
-    setup_logging(app, config={
-        "LOGGING": {
-            "version": 1,
-            "formatters": {
-                "json": {
-                    "()": "fastapi_logging_kit.formatters.JSONFormatter",
-                    "fmt": "%(levelname)s %(message)s %(context)s",
-                    "structured_logging": {
-                        "JSON_COMPACT": True,
-                        "MAX_DEPTH": 8,
-                        "MAX_ITEMS": 100,
-                        "MAX_STRING_LENGTH": 4096,
-                        "MAX_EVENT_BYTES": 65536,
-                        "MAX_EXCEPTION_FRAMES": 32,
-                        "EXCEPTION_MODE": "type",
-                        "INCLUDE_EXTRA": True,
-                        "REDACT_FIELDS": ["private_reference"],
+    setup_logging(
+        app,
+        config={
+            "LOGGING": {
+                "version": 1,
+                "formatters": {
+                    "json": {
+                        "()": "fastapi_logging_kit.formatters.JSONFormatter",
+                        "fmt": "%(levelname)s %(message)s %(context)s",
+                        "structured_logging": {
+                            "JSON_COMPACT": True,
+                            "MAX_DEPTH": 8,
+                            "MAX_ITEMS": 100,
+                            "MAX_STRING_LENGTH": 4096,
+                            "MAX_EVENT_BYTES": 65536,
+                            "MAX_EXCEPTION_FRAMES": 32,
+                            "EXCEPTION_MODE": "type",
+                            "INCLUDE_EXTRA": True,
+                            "REDACT_FIELDS": ["private_reference"],
+                        },
                     },
                 },
+                "handlers": {
+                    "console": {"class": "logging.StreamHandler", "formatter": "json"}
+                },
+                "root": {"level": "INFO", "handlers": ["console"]},
             },
-            "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "json"}},
-            "root": {"level": "INFO", "handlers": ["console"]},
         },
-    })
+    )
 
 ``MAX_DEPTH`` and ``MAX_ITEMS`` limit traversal of nested data;
 ``MAX_STRING_LENGTH`` and ``MAX_EVENT_BYTES`` constrain individual values
@@ -291,7 +299,7 @@ not a durable delivery system.
 ---------
 
 - **Type**: ``dict``
-- **Description**: The SMTP settings used to deliver notifications. In `django_logging` these were top-level Django settings; here they are namespaced under this key. See :ref:`required_email_settings`.
+- **Description**: The SMTP settings used to deliver notifications, grouped under the ``EMAIL`` configuration key. See :ref:`required_email_settings`.
 - **Default**: ``{}``
 
 ``LOG_ROTATION``
