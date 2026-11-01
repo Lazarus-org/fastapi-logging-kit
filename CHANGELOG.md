@@ -6,6 +6,7 @@ All notable changes to FastAPI Logging Kit are documented here.
 
 ### Fixed
 
+- Limit the legacy FastAPI test lane to Python 3.11–3.13; use the modern lane on Python 3.14 and 3.15 to avoid deprecated framework APIs.
 - Use Poetry dependency groups and a lockfile instead of duplicate requirements manifests.
 - Validate installed package metadata against the authoritative project dependencies.
 - Remove test-client deprecations through compatible legacy dependencies and an updated modern stack.

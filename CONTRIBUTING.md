@@ -197,7 +197,10 @@ as errors. The current lane uses Starlette 1.10+ with HTTPX2; the legacy lane
 uses compatible HTTPX/AnyIO/pytest versions so deprecated third-party calls do
 not generate warnings. Warning suppression is not used. Run `poetry run tox` to check
 all supported Python/FastAPI combinations; each environment requires its matching
-interpreter. Node.js 22 or later runs the LogiBoard security tests. On restricted
+interpreter. The legacy FastAPI 0.100–0.109 lane runs on Python 3.11–3.13;
+Python 3.14 and 3.15 use the modern lane because legacy FastAPI calls
+`asyncio.iscoroutinefunction()`, deprecated in Python 3.14.
+Node.js 22 or later runs the LogiBoard security tests. On restricted
 systems, supply a fresh writable temporary directory with
 `--basetemp=.pytest_cache/tmp-local`; pytest owns and clears that directory.
 

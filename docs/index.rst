@@ -53,9 +53,13 @@ Supported Versions
 ==========  ==========================================
   FastAPI     Python
 ==========  ==========================================
-0.100+      3.11, 3.12, 3.13, 3.14
+0.100+      3.11, 3.12, 3.13
 0.162+      3.11, 3.12, 3.13, 3.14, 3.15
 ==========  ==========================================
+
+The legacy FastAPI 0.100–0.109 test lane runs on Python 3.11–3.13.
+Python 3.14 and 3.15 use the modern lane: legacy FastAPI calls
+``asyncio.iscoroutinefunction()``, deprecated in Python 3.14.
 
 Documentation
 -------------

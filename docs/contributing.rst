@@ -274,3 +274,6 @@ Tests treat deprecation warnings as errors. The current compatibility lane uses
 Starlette 1.10+ and HTTPX2. The legacy FastAPI lane uses older compatible HTTPX,
 AnyIO and pytest releases because its Starlette TestClient still calls the
 older APIs. These are dependency compatibility constraints, not warning filters.
+The legacy FastAPI 0.100–0.109 lane runs on Python 3.11–3.13; Python 3.14
+and 3.15 use the modern lane. Legacy FastAPI calls
+``asyncio.iscoroutinefunction()``, deprecated in Python 3.14.
