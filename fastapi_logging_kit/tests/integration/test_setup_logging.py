@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Dict, Iterator, List
 
 import pytest
@@ -441,6 +442,37 @@ class TestLogiBoardIntegration:
                 add_middleware=False,
             )
         assert record_set_config == []
+
+    @pytest.mark.parametrize(
+        "prefix, route_name, expected",
+        [
+            ("", "application-dashboard", "already registered"),
+            ("/admin", "log-iboard", "/admin/log-iboard/"),
+        ],
+    )
+    def test_wrapped_router_conflicts_fail_before_activation(
+        self, tmp_path, record_set_config, prefix, route_name, expected
+    ) -> None:
+        """Validate modern router containers even on the legacy FastAPI lane."""
+        router = APIRouter()
+        router.add_api_route("/log-iboard/", lambda: None, name=route_name)
+        app = FastAPI()
+        app.router.routes.append(
+            SimpleNamespace(
+                original_router=router,
+                include_context=SimpleNamespace(prefix=prefix),
+            )
+        )
+
+        with pytest.raises(RuntimeError, match=expected):
+            setup_logging(
+                app,
+                base_config(tmp_path, INCLUDE_LOG_iBOARD=True),
+                add_middleware=False,
+            )
+
+        assert record_set_config == []
+        assert not app.user_middleware
 
     def test_structured_setup_respects_legacy_log_iboard_opt_in(self) -> None:
         """Test that structured setup still honors the explicit LogiBoard opt-in."""

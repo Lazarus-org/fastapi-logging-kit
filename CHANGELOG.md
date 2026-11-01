@@ -7,6 +7,7 @@ All notable changes to FastAPI Logging Kit are documented here.
 ### Fixed
 
 - Fix tox bootstrap requirement parsing so compatibility environments can start.
+- Cover modern router-container validation independently of the installed FastAPI version.
 
 ## 1.0.0 - 2026-11-01
 
