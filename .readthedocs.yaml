@@ -13,7 +13,9 @@ build:
   jobs:
     install:
       - python -m pip install "poetry>=2.2,<3"
-      - POETRY_VIRTUALENVS_CREATE=false poetry install --only main,docs --no-interaction
+      # Read the Docs does not activate its virtualenv for Poetry automatically.
+      - VIRTUAL_ENV="$READTHEDOCS_VIRTUALENV_PATH" poetry install --only main,docs --no-interaction
+      - python -m sphinx --version
 
 # Build documentation with Sphinx
 sphinx:
