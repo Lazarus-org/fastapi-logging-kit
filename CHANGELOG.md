@@ -6,6 +6,11 @@ All notable changes to FastAPI Logging Kit are documented here.
 
 ### Fixed
 
+- Use Poetry dependency groups and a lockfile instead of duplicate requirements manifests.
+- Validate installed package metadata against the authoritative project dependencies.
+- Remove test-client deprecations through compatible legacy dependencies and an updated modern stack.
+- Make deprecation warnings fail the test suite.
+
 - Fix tox bootstrap requirement parsing so compatibility environments can start.
 - Cover modern router-container validation independently of the installed FastAPI version.
 

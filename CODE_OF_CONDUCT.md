@@ -86,7 +86,7 @@ we’re thrilled that you want to contribute to `fastapi_logging_kit`! to ensure
     poetry export -f requirements.txt --with dev --output requirements-dev-export.txt --without-hashes
     ```
 
-Exported files contain resolved versions. Keep the hand-maintained version ranges in `packages/requirements.txt` and `packages/requirements-dev.txt` aligned with `pyproject.toml`; compare exports before updating those manifests, since tests check runtime manifest consistency.
+Exported files are optional deployment snapshots. Manage runtime and development dependency groups directly in `pyproject.toml` with Poetry, and commit `poetry.lock` after dependency changes. The project does not maintain parallel requirements manifests.
 
 For artifact validation, PyPI Trusted Publishing, TestPyPI, and manual publishing, see the detailed [publishing guide](CONTRIBUTING.md#publishing-guide).
 

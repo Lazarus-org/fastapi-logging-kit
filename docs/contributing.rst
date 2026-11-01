@@ -248,4 +248,29 @@ The complete `publishing guide <https://github.com/lazarus-org/fastapi-logging-k
 covers Poetry builds, artifact validation, pushing the release tag, GitHub
 Trusted Publishing, TestPyPI, and manual Poetry publishing. The same guide
 retains dependency export instructions and explains how to preserve the
-canonical requirement manifests while generating resolved snapshots.
+authoritative Poetry dependency declarations while generating optional resolved snapshots.
+
+Dependency management and deprecation checks
+--------------------------------------------
+
+Runtime requirements live in ``[project.dependencies]`` in ``pyproject.toml``.
+PEP 735 dependency groups define test, quality, documentation and build tooling;
+``dev`` includes those groups. Poetry resolves them into ``poetry.lock``.
+Dependabot updates this single project instead of parallel requirements files.
+
+.. code-block:: bash
+
+   poetry add package-name
+   poetry add --group test package-name
+   poetry lock
+   poetry check --lock
+   poetry install --extras sqlalchemy
+
+Commit the declarations and lockfile together. Optional ``poetry export``
+commands remain available for deployment snapshots; those exports are not
+used by CI or Read the Docs as dependency sources.
+
+Tests treat deprecation warnings as errors. The current compatibility lane uses
+Starlette 1.10+ and HTTPX2. The legacy FastAPI lane uses older compatible HTTPX,
+AnyIO and pytest releases because its Starlette TestClient still calls the
+older APIs. These are dependency compatibility constraints, not warning filters.

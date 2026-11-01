@@ -171,27 +171,31 @@ Activate `.venv` (`source .venv/bin/activate` on POSIX,
 `.venv\Scripts\Activate.ps1` in PowerShell), then install the package and tools:
 
 ```sh
-python -m pip install -e ".[sqlalchemy]" -r packages/requirements-dev.txt
+python -m pip install "poetry>=2.2,<3"
+poetry install --extras sqlalchemy
 git switch -c feature/your-change
 ```
 
-Poetry is also supported: `poetry install --extras sqlalchemy` installs the
-project's development group and SQLAlchemy extra. No `uv.lock` or Django
-installation is required.
+Poetry installs dependencies directly from `pyproject.toml` and `poetry.lock`.
+The `test`, `quality`, `docs`, and `build` dependency groups are combined by
+`dev`. No exported requirements files or Django installation are required.
 
 ## Validation
 
 ```sh
-python -m pytest
+poetry run pytest
 node --test fastapi_logging_kit/tests/js/logiboard-security.test.mjs
-python -m tox -e py312-fastapi0120
-python -m mypy fastapi_logging_kit
-python -m pylint -rn -sn --rcfile=pyproject.toml fastapi_logging_kit
-python -m bandit -c pyproject.toml -r fastapi_logging_kit
-python -m sphinx -W --keep-going -b html docs docs/_build/html
+poetry run tox -e py312-fastapi0120
+poetry run mypy fastapi_logging_kit
+poetry run pylint -rn -sn --rcfile=pyproject.toml fastapi_logging_kit
+poetry run bandit -c pyproject.toml -r fastapi_logging_kit
+poetry run sphinx-build -W --keep-going -b html docs docs/_build/html
 ```
 
-Pytest enforces **100% Python statement coverage**. Run `python -m tox` to check
+Pytest enforces **100% Python statement coverage** and treats deprecation warnings
+as errors. The current lane uses Starlette 1.10+ with HTTPX2; the legacy lane
+uses compatible HTTPX/AnyIO/pytest versions so deprecated third-party calls do
+not generate warnings. Warning suppression is not used. Run `poetry run tox` to check
 all supported Python/FastAPI combinations; each environment requires its matching
 interpreter. Node.js 22 or later runs the LogiBoard security tests. On restricted
 systems, supply a fresh writable temporary directory with
@@ -200,13 +204,15 @@ systems, supply a fresh writable temporary directory with
 Use Black and isort for Python formatting. Install and run the existing hooks:
 
 ```sh
-python -m pre_commit install
-python -m pre_commit run --all-files
+poetry run pre-commit install
+poetry run pre-commit run --all-files
 ```
 
 The [Sphinx contribution guide](https://fastapi-logging-kit.readthedocs.io/en/latest/contributing.html)
-has additional details. Keep `pyproject.toml`, dependency manifests, the tox
-matrix, CI, and documented runtime support aligned when changing dependencies.
+has additional details. Keep `pyproject.toml`, `poetry.lock`, the tox matrix, CI, and documented runtime
+support aligned when changing dependencies. Use `poetry add PACKAGE` for runtime
+dependencies and `poetry add --group test PACKAGE` (or `quality`, `docs`, `build`)
+for tooling. Run `poetry lock` after editing declarations and commit the lockfile.
 
 ## Pull requests
 
@@ -226,10 +232,10 @@ versions and a minimal example with sensitive log data removed.
 2. Validate the release locally:
 
    ```sh
-   python -m pip install build twine
-   python -m build --sdist --wheel
-   python -m twine check dist/*
-   python scripts/verify_distributions.py dist --tag v1.0.0
+   poetry install --only main,build
+   poetry build
+   poetry run twine check dist/*
+   poetry run python scripts/verify_distributions.py dist --tag v1.0.0
    ```
 
    Substitute the intended version for `v1.0.0` and use a clean `dist` directory;
@@ -320,11 +326,10 @@ poetry export -f requirements.txt --output requirements-export.txt --without-has
 poetry export -f requirements.txt --with dev --output requirements-dev-export.txt --without-hashes
 ```
 
-These are resolved snapshots. The canonical manifests
-`packages/requirements.txt` and `packages/requirements-dev.txt` currently contain
-maintained version ranges; do not overwrite them with resolved exports without
-review. Update their ranges alongside `pyproject.toml` and run the consistency
-tests. If SQLAlchemy is needed in a deployment export, include
+These optional exports are deployment snapshots, not project dependency sources.
+The authoritative declarations are in `pyproject.toml`, and Poetry records the
+resolved versions in `poetry.lock`. Dependabot updates those manager-native files;
+do not introduce a second hand-maintained requirements manifest. If SQLAlchemy is needed in a deployment export, include
 `--extras sqlalchemy`. Export is a development/maintenance step, not a reason to
 change dependency files in every pull request.
 
@@ -337,7 +342,7 @@ directory. Archive any previous build artifacts separately first.
 
 ```sh
 poetry build
-poetry run python -m pip install twine
+poetry install --only main,build
 poetry run twine check dist/*
 poetry run python scripts/verify_distributions.py dist --tag v1.1.0
 ```
