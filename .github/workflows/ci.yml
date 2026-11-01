@@ -166,7 +166,7 @@ jobs:
         run: sphinx-build -W --keep-going -b html docs /tmp/fastapi-logging-kit-docs
 
       - name: Upload distributions for inspection
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fastapi-logging-kit-distributions
           path: dist/*
