@@ -33,8 +33,8 @@ repos:
     hooks:
       - id: pyupgrade
 
-  - repo: https://github.com/pre-commit/mirrors-isort
-    rev: v5.13.2
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
     hooks:
       - id: isort
         exclude: (migrations/|tests/|docs/).*
@@ -56,7 +56,7 @@ repos:
     rev: 1.9.4
     hooks:
       - id: bandit
-        args: [ "-c", "pyproject.toml", "-r", "." ]
+        args: [ "-c", "pyproject.toml", "-r", "fastapi_logging_kit" ]
         additional_dependencies: [ "bandit[toml]" ]
         exclude: (migrations/|tests/|docs/).*
 
@@ -64,9 +64,10 @@ repos:
     rev: v1.7.8
     hooks:
       - id: docformatter
-        args: [ "--in-place", "--recursive", "--blank" ]
+        args: [ "--in-place", "--recursive", "--black" ]
         additional_dependencies: [ "tomli" ]
-        exclude: (migrations/|tests/|docs/).*
+        # Black enforces module/class spacing here; docformatter 1.7.8 undoes it.
+        exclude: (migrations/|tests/|docs/).*|^fastapi_logging_kit/exceptions\.py$
 
   - repo: https://github.com/adamchainz/blacken-docs
     rev: 1.20.0
