@@ -4,8 +4,19 @@ All notable changes to FastAPI Logging Kit are documented here.
 
 ## Unreleased
 
+## 1.0.0 - 2026-11-01
+
+First release of FastAPI Logging Kit.
+
 ### Added
 
+- Add explicit FastAPI/ASGI setup with structured logging configuration and extensible components.
+- Add JSON, XML, FLAT, and colored console formatters with bounded serialization and named-field redaction.
+- Add isolated request context, request IDs, and opt-in request, response, streaming, and SQL diagnostics.
+- Add synchronous and asynchronous execution tracking with optional SQLAlchemy instrumentation.
+- Add per-level file handlers, size/time rotation, gzip archives, SMTP notifications, and maintenance commands.
+- Add the LogiBoard interface with application-scoped permission checks.
+- Add contribution and publishing guides, including synchronized Commitizen version increments.
 - Add Python 3.15 to the compatibility matrix and package classifiers.
 - Add regression coverage for LogiBoard installation conflicts, repeated setup, and application-scoped permission policies.
 - Add browser-side security regressions for archive filenames and ZIP folder-tree construction.
@@ -29,6 +40,11 @@ All notable changes to FastAPI Logging Kit are documented here.
 - Update test and documentation tooling to versions that support the new Python matrix.
 
 ### Fixed
+
+- Adapt contribution, conduct, security, and release policies to FastAPI Logging Kit.
+- Restore the FastAPI CI matrix and reuse it for version-checked release builds.
+- Exclude internal tests from wheels while retaining source-distribution support files.
+- Correct structured configuration examples and cross-platform static-check exclusions.
 
 - Restrict log archiving to recognized rotated log filenames; unrelated files are no longer moved.
 - Preserve nested log-directory paths when archiving rotated files.
