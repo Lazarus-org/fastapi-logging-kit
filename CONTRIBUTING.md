@@ -204,6 +204,14 @@ Node.js 22 or later runs the LogiBoard security tests. On restricted
 systems, supply a fresh writable temporary directory with
 `--basetemp=.pytest_cache/tmp-local`; pytest owns and clears that directory.
 
+Each tox environment writes an XML coverage report to `.tox/<environment>/coverage.xml`
+alongside its HTML report. CI saves the complete `py311-fastapi0120` report as the
+`complete-coverage` artifact and uploads it to Codecov on `main` only. Configure
+the organization or repository Actions secret `CODECOV_TOKEN` with access to this
+repository. Upload failures fail CI; pull requests and release tags retain the
+artifact without uploading to Codecov. Reusable CI callers can pass the optional
+`CODECOV_TOKEN` secret; the release workflow already forwards it.
+
 Use Black and isort for Python formatting. Install and run the existing hooks:
 
 ```sh

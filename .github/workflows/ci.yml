@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
   workflow_call:
+    secrets:
+      CODECOV_TOKEN:
+        description: Organization Codecov upload token
+        required: false
 
 permissions:
   contents: read
@@ -60,6 +64,27 @@ jobs:
 
       - name: Run compatibility environment
         run: poetry run tox -e "${{ matrix.tox-env }}"
+
+      - name: Save complete coverage report
+        if: matrix.tox-env == 'py311-fastapi0120'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: complete-coverage
+          path: .tox/py311-fastapi0120/coverage.xml
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload complete main-branch coverage to Codecov
+        if: github.ref == 'refs/heads/main' && matrix.tox-env == 'py311-fastapi0120'
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ${{ github.repository }}
+          files: .tox/py311-fastapi0120/coverage.xml
+          disable_search: true
+          fail_ci_if_error: true
+          name: complete-coverage
 
   quality:
     name: Static and browser-side security checks
